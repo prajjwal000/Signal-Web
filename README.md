@@ -18,6 +18,7 @@ Built as a full-stack assignment with deliberate architectural decisions, clean 
 
 ---
 
+
 ## What's Built
 
 - **Registration & auth** — phone/username + display name, fixed mock OTP, JWT session

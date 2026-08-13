@@ -1,4 +1,7 @@
-# Project-specific
 plan.md
 assignment.md
+.env
 Signal-Desktop/
+backend/local.db
+backend/__pycache__/
+backend/**/__pycache__/
