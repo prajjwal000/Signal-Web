@@ -1,8 +1,7 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
+description = "Signal clone backend"
 authors = [
     { name = "Prajjwal Verma", email = "prajjwalverma74@gmail.com" }
 ]
@@ -10,7 +9,9 @@ requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.19.1",
     "fastapi>=0.141.1",
+    "libsql>=0.1.11",
     "sqlalchemy>=2.0.52",
+    "websockets>=17.0.1",
 ]
 
 [project.scripts]
