@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useWebSocketContext } from '@/contexts/WebSocketContext';
+import { useReplyStore } from '@/stores/replyStore';
 import type { Message } from '@/lib/types';
 import { getAttachmentUrl } from '@/lib/api';
 import MessageStatus from './MessageStatus';
@@ -38,6 +39,7 @@ export default function MessageBubble({
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const user = useAuthStore((s) => s.user);
   const { send } = useWebSocketContext();
+  const setReplyTo = useReplyStore((s) => s.setReplyTo);
 
   const handleReaction = (emoji: string) => {
     send({ type: 'reaction', message_id: message.id, emoji, action: 'add' });
@@ -172,13 +174,23 @@ export default function MessageBubble({
         )}
       </div>
 
-      {/* Reaction trigger */}
-      <div className={`absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 ${
-        isOwn ? '-left-8' : '-right-8'
+      {/* Hover toolbar */}
+      <div className={`absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center gap-0.5 ${
+        isOwn ? '-left-20' : '-right-20'
       }`}>
+        <button
+          onClick={() => setReplyTo(message)}
+          className="p-1 rounded-full bg-bg-tertiary hover:bg-bg-active text-label-secondary shadow-sm"
+          title="Reply"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+          </svg>
+        </button>
         <button
           onClick={() => setShowReactionPicker(!showReactionPicker)}
           className="p-1 rounded-full bg-bg-tertiary hover:bg-bg-active text-label-secondary shadow-sm"
+          title="React"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

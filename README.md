@@ -1,8 +1,6 @@
 # Signal Clone — Secure Messaging Platform
 
-A functional clone of the Signal messaging application that replicates Signal's design, user experience, and core messaging workflows — including real-time 1:1 and group messaging, delivery/read receipts, typing indicators, and a pixel-perfect Signal-faithful UI.
-
-Built as a full-stack assignment with deliberate architectural decisions, clean separation of concerns, and UI fidelity to Signal's actual design system.
+A functional clone of the Signal messaging application replicating Signal's design, UX, and core messaging workflows — real-time 1:1 and group messaging, delivery/read receipts, typing indicators, and a Signal-faithful UI.
 
 ---
 
@@ -10,109 +8,92 @@ Built as a full-stack assignment with deliberate architectural decisions, clean 
 
 | Layer | Technology | Role |
 |-------|-----------|------|
-| Frontend | Next.js 16 (TypeScript) + React 19 | UI layer — components, routing, state |
-| Styling | Tailwind CSS v4 | Utility-first CSS with CSS custom properties for theming |
-| State | Zustand | Lightweight client-side stores (conversations, messages, auth, UI) |
-| Backend | Python 3.13 + FastAPI | REST API, WebSocket server, all business logic |
-| Database | Turso (libSQL) | Hosted SQLite — persistent storage via `libsql` over HTTP |
-| Real-time | WebSockets (native) | Live messages, typing, receipts, presence, reactions |
-| Deploy | Vercel (frontend) + Railway (backend) | Edge hosting + persistent backend |
-| Auth | PyJWT | Mocked OTP (`0000`), JWT session tokens (7-day expiry) |
+| Frontend | Next.js 16 (TypeScript) + React 19 | UI — components, routing, state |
+| Styling | Tailwind CSS v4 | CSS custom properties for Signal's theme |
+| State | Zustand | Client-side stores (auth, conversations, messages, contacts, UI) |
+| Backend | Python 3.13 + FastAPI | REST API + WebSocket server |
+| Database | Turso (libSQL) | Hosted SQLite — persistent storage |
+| Real-time | WebSockets (native) | Messages, typing, receipts, presence, reactions |
+| Auth | PyJWT | Mocked OTP (`0000`), JWT sessions (7-day expiry) |
+| Deploy | Vercel (frontend) + Railway (backend) | |
 
 ---
 
-## Setup Instructions
-
-### Prerequisites
-- Node.js 18+ and pnpm (for frontend)
-- Python 3.13+ and uv (for backend)
-- A Turso account (free tier works)
+## Setup
 
 ### Backend
 
 ```bash
 cd backend
-
-# Install dependencies
 uv sync
 
-# Set environment variables (create .env or export)
-export TURSO_DATABASE_URL="libsql://your-db-url.turso.io"
-export TURSO_AUTH_TOKEN="your-turso-auth-token"
-export JWT_SECRET="any-random-secret-string"
-export NTFY_TOPIC="your-ntfy-topic"      # optional: for easter egg push notifications
-export NTFY_USERNAME="your-ntfy-username"  # optional: username that triggers notifications
+export TURSO_DATABASE_URL="libsql://your-db.turso.io"
+export TURSO_AUTH_TOKEN="your-token"
+export JWT_SECRET="any-secret"
 
-# Run the server
 uv run uvicorn src.backend.main:app --reload --port 8000
 ```
 
-The schema is auto-created on startup via `CREATE TABLE IF NOT EXISTS`. Seed data is loaded automatically — 13 pre-seeded users with conversations and messages.
+Schema auto-creates on startup. 13 users seeded automatically.
 
 ### Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 pnpm install
-
-# Set environment variable
 export NEXT_PUBLIC_API_URL="http://localhost:8000"
-
-# Run the dev server
-pnpm dev
+pnapp dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and register with any username (OTP is always `0000`).
+Open [localhost:3000](http://localhost:3000), register with any username (OTP is always `0000`).
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```
 Signal-Web/
 ├── frontend/                    # Next.js 16 (App Router)
 │   ├── app/                     # Routes: /, /auth, /chat/[convId], /settings
-│   ├── components/              # UI components organized by domain
-│   │   ├── chat/                # ChatPane, MessageList, MessageBubble, CompositionArea, etc.
+│   ├── components/              # UI by domain
+│   │   ├── chat/                # ChatPane, MessageList, MessageBubble, CompositionArea
 │   │   ├── layout/              # AppLayout, Sidebar
-│   │   ├── sidebar/             # SidebarHeader, ConversationItem
-│   │   └── ui/                  # Reusable: Avatar, Skeleton, Toast, ShortcutsModal
+│   │   └── ui/                  # Avatar, Skeleton, Toast, ShortcutsModal
 │   ├── contexts/                # WebSocketContext, ThemeContext
-│   ├── hooks/                   # useToast
-│   ├── stores/                  # Zustand: auth, conversation, message, contact, UI stores
-│   └── lib/                     # api.ts (REST client), types.ts (TypeScript types)
+│   ├── stores/                  # Zustand stores
+│   └── lib/                     # api.ts (REST), types.ts
 │
 ├── backend/                     # FastAPI
 │   └── src/backend/
-│       ├── main.py              # App init, router registration, startup seed
-│       ├── models.py            # Schema SQL (CREATE TABLE statements)
+│       ├── main.py              # App init, startup seed
+│       ├── models.py            # Schema SQL
 │       ├── db.py                # Turso/libSQL connection
-│       ├── auth.py              # JWT encode/decode, get_current_user dependency
-│       ├── auth_router.py       # POST /auth/register, /auth/verify, /auth/login, GET /auth/me
-│       ├── conversations.py     # CRUD conversations, messages, members
-│       ├── contacts.py          # Contact list, add, search users
+│       ├── auth.py              # JWT + get_current_user
+│       ├── auth_router.py       # Register, verify, login, me
+│       ├── conversations.py     # Conversations, messages, members
+│       ├── contacts.py          # Contact list, search
 │       ├── attachments.py       # File upload/serve
-│       ├── reactions.py         # Emoji reactions CRUD
-│       └── ws.py                # WebSocket handler (all real-time events)
-│
+│       ├── reactions.py         # Emoji reactions
+│       └── ws.py                # WebSocket handler (all real-time)
 ```
 
 ### Data Flow
 
-1. **Auth**: Register → mock OTP verification → JWT issued → stored in `localStorage`
-2. **Messaging**: User types → WebSocket `message` event → server persists → broadcasts to all conversation members
-3. **Receipts**: Server auto-sends `delivered` on receive; client sends `read_all` when conversation opens
-4. **Typing**: Client sends `typing_start`/`typing_stop` → server broadcasts to other members (never persisted)
-5. **Presence**: Server tracks `last_seen` per user; broadcasts online status to conversation members
+1. **Auth** → Register → mock OTP (`0000`) → JWT → `localStorage`
+2. **Messaging** → Client sends `message` via WS → server persists → broadcasts to members
+3. **Receipts** → Server auto-sends `delivered` on receive; client sends `read_all` when conversation opens
+4. **Typing** → `typing_start`/`typing_stop` → server broadcasts (never persisted)
+5. **Presence** → Server tracks `last_seen`; broadcasts online/offline to conversation members
+
+### Easter Egg
+
+A pre-seeded user **Prajjwal Verma** (`prajjwal`) triggers real push notifications. When any message is sent to a conversation containing this user, the backend POSTs to [ntfy.sh](https://ntfy.sh) with the sender name and message preview — configured via `NTFY_TOPIC` and `NTFY_USERNAME` env vars. creator would then get notification and connect using his id to chat with examiner.
 
 ---
 
 ## Database Schema
 
 ```sql
--- Users
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
@@ -123,7 +104,6 @@ CREATE TABLE users (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
--- Contacts (directional: user_id has contact_id in their address book)
 CREATE TABLE contacts (
     user_id INTEGER NOT NULL,
     contact_id INTEGER NOT NULL,
@@ -131,7 +111,6 @@ CREATE TABLE contacts (
     PRIMARY KEY (user_id, contact_id)
 );
 
--- Conversations (1:1 or group)
 CREATE TABLE conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     is_group INTEGER NOT NULL DEFAULT 0,
@@ -140,7 +119,6 @@ CREATE TABLE conversations (
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
--- Conversation membership with roles
 CREATE TABLE conversation_members (
     conversation_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
@@ -149,7 +127,6 @@ CREATE TABLE conversation_members (
     PRIMARY KEY (conversation_id, user_id)
 );
 
--- Messages with reply-to and disappearing message support
 CREATE TABLE messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id INTEGER NOT NULL,
@@ -160,7 +137,6 @@ CREATE TABLE messages (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
--- Delivery/read receipts per recipient
 CREATE TABLE message_receipts (
     message_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
@@ -169,7 +145,6 @@ CREATE TABLE message_receipts (
     PRIMARY KEY (message_id, user_id)
 );
 
--- File attachments (stored as BLOB in DB for prototype)
 CREATE TABLE attachments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sender_id INTEGER NOT NULL,
@@ -180,7 +155,6 @@ CREATE TABLE attachments (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
--- Emoji reactions (per message, per user, per emoji)
 CREATE TABLE message_reactions (
     message_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
@@ -196,52 +170,50 @@ CREATE TABLE message_reactions (
 
 ## API Overview
 
-### Auth (`/auth`)
+### Auth
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/auth/register` | Register new user (username, display_name, phone) → returns OTP |
-| POST | `/auth/verify` | Verify OTP + set password → returns JWT |
-| POST | `/auth/login` | Login with username + password → returns JWT |
-| GET | `/auth/me` | Get current user profile (requires Bearer token) |
+| POST | `/auth/register` | Register → returns OTP |
+| POST | `/auth/verify` | Verify OTP + set password → JWT |
+| POST | `/auth/login` | Login → JWT |
+| GET | `/auth/me` | Current user profile |
 
-### Contacts (`/contacts`)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/contacts` | List user's contacts |
-| POST | `/contacts` | Add a contact by user ID |
-| GET | `/contacts/search?q=` | Search users by username/display_name |
-
-### Conversations (`/conversations`)
+### Contacts
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/conversations` | List all conversations (with last message, unread count) |
-| POST | `/conversations` | Create conversation (1:1 by user_id or group with name + member_ids) |
+| GET | `/contacts` | List contacts |
+| POST | `/contacts` | Add contact by user ID |
+| GET | `/contacts/search?q=` | Search users |
+
+### Conversations
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/conversations` | List conversations (last message, unread count) |
+| POST | `/conversations` | Create 1:1 or group conversation |
 | GET | `/conversations/{id}/messages` | Paginated message history |
-| GET | `/conversations/{id}/members` | List group members with roles |
-| POST | `/conversations/{id}/members` | Add member to group (admin only) |
-| DELETE | `/conversations/{id}/members/{user_id}` | Remove member from group (admin only) |
+| GET | `/conversations/{id}/members` | List group members |
+| POST | `/conversations/{id}/members` | Add member (admin) |
+| DELETE | `/conversations/{id}/members/{user_id}` | Remove member (admin) |
 
-### Attachments (`/attachments`)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/attachments/{message_id}` | Upload file attachment (multipart/form-data) |
-| GET | `/attachments/{id}` | Download attachment file |
-
-### Reactions (`/reactions`)
+### Attachments
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/reactions/{message_id}` | Add/toggle emoji reaction |
+| POST | `/attachments/{message_id}` | Upload (multipart) |
+| GET | `/attachments/{id}` | Download |
+
+### Reactions
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/reactions/{message_id}` | Add/toggle reaction |
 | DELETE | `/reactions/{message_id}/{emoji}` | Remove reaction |
-| GET | `/reactions/{message_id}` | List reactions for a message |
+| GET | `/reactions/{message_id}` | List reactions |
 
 ### WebSocket (`/ws?token=<jwt>`)
-
-All real-time events flow through a single WebSocket connection:
 
 | Event | Direction | Description |
 |-------|-----------|-------------|
@@ -249,67 +221,26 @@ All real-time events flow through a single WebSocket connection:
 | `typing_start` / `typing_stop` | both | Typing indicators |
 | `receipt` | both | Delivery/read receipts |
 | `presence` | both | Online/offline status |
-| `read_all` | client→server | Mark all messages as read |
-| `reaction` | both | Add/remove emoji reactions |
-| `message_expiring` | server→client | Disappearing message timer started |
+| `read_all` | client→server | Mark all messages read |
+| `reaction` | both | Emoji reactions |
+| `message_expiring` | server→client | Disappearing message timer |
 
 ---
 
-## Features Implemented
+## Features
 
-### Core Features
-- **Authentication** — Register with phone/username, mock OTP (`0000`), JWT sessions, login/logout
-- **Contacts** — Directional address book, search users, add contacts
-- **1:1 Messaging** — Real-time send/receive, optimistic UI, message timestamps
-- **Group Messaging** — Create groups, add/remove members (admin controls), sender names
-- **Delivery Pipeline** — `sending → sent → delivered → read` with per-recipient granularity
-- **Typing Indicators** — Real-time, ephemeral, never persisted
-- **Online Presence** — Last-seen tracking, online/offline indicators
-- **Signal-Faithful UI** — Asymmetric message bubbles, proper spacing, conversation list + chat pane layout
+**Core:** Auth (mock OTP, JWT) · Contacts · 1:1 & group messaging · Delivery/read receipts (sending → sent → delivered → read) · Typing indicators · Online presence · Signal-faithful UI
 
-### Bonus Features
-- **Attachments** — Upload and view images/files inline
-- **Message Reactions** — Add/toggle/remove emoji reactions with reaction bar
-- **Reply-to / Quoted Messages** — Reply to specific messages with preview
-- **Disappearing Messages** — Configurable timer (off, 30s, 5m, 1h, 1d)
-- **Dark/Light Mode** — Toggle with localStorage persistence, respects `prefers-color-scheme`
-- **Responsive Design** — Mobile-first with sidebar/chat toggle, back button, deep links
-- **Keyboard Shortcuts** — `Ctrl+K` (new chat), `Ctrl+/` (shortcuts), `Esc` (back/close)
-- **Settings Page** — Account, privacy, notifications, appearance, linked devices, help sections
+**Bonus:** Attachments (images/files) · Emoji reactions · Reply-to/quoted messages · Disappearing messages (30s/5m/1h/1d) · Dark/light mode · Responsive design · Keyboard shortcuts (`Ctrl+K`, `Ctrl+/`, `Esc`) · Settings page
 
-### Mocked / Placeholder
-- End-to-end encryption (simulated)
-- Real phone verification
-- Voice/video calls
-- Stories
-- Linked devices
-
----
-
-## Seed Data
-
-The database is seeded automatically on first startup with **13 pre-seeded users** and sample conversations/messages. After registration, the app is immediately usable — you can start messaging other users right away.
-
-To re-seed: `POST /seed`
-
----
-
-## Easter Egg
-
-There is a pre-seeded user named **Prajjwal Verma** (username: `prajjwal`) in the app. If you send a message to this user, the developer will receive a real-time push notification on their phone via [ntfy.sh](https://ntfy.sh). This was implemented as a small fun addition to demonstrate external service integration with the messaging backend.
-
-The notification is triggered server-side in the WebSocket message handler. When a message is sent to any conversation that includes `prajjwal` as a member, the backend makes an HTTP POST to ntfy.sh with the sender name and message preview. The topic is configured via the `NTFY_TOPIC` environment variable.
+**Mocked:** E2E encryption, phone verification, voice/video calls, stories, linked devices
 
 ---
 
 ## Key Decisions
 
-1. **No ORM** — Raw SQL via `libsql` for transparency and simplicity. The schema is simple enough that an ORM adds overhead without benefit.
-2. **Turso over Railway SQLite** — Railway containers are ephemeral; a local SQLite file would die on redeploy. Turso provides persistent hosted libSQL.
-3. **Singleton WebSocket** — A single `WebSocketProvider` context owns the connection and distributes events to the entire component tree. Prevents duplicate connections.
-4. **CSS Custom Properties for Theming** — Signal's color palette as CSS variables with `[data-theme="light"]` override. Registered in Tailwind 4's `@theme inline` for direct class usage.
-5. **Key-based Remounting** — Conversation changes force full component remount via React `key`, eliminating stale state bugs without complex cleanup logic.
-6. **Mock OTP** — Fixed `"0000"` for all users. Registration returns it in the response body for testing.
-
----
-
+1. **No ORM** — Raw SQL via `libsql` for transparency; schema is simple enough.
+2. **Turso over Railway SQLite** — Ephemeral containers lose local files on redeploy.
+3. **Singleton WebSocket** — One `WebSocketProvider` prevents duplicate connections across the component tree.
+4. **CSS Custom Properties** — Signal's palette as CSS variables; `[data-theme]` override for dark/light.
+5. **Key-based Remounting** — React `key` on conversation ID forces clean state on switch.
