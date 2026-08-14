@@ -6,31 +6,37 @@ import * as api from '@/lib/api';
 import type { Contact } from '@/lib/types';
 import Avatar from '@/components/ui/Avatar';
 
+type PanelMode = 'closed' | 'new-chat' | 'new-group-select' | 'new-group-name';
+
 export default function SidebarHeader() {
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Contact[]>([]);
-  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [panelMode, setPanelMode] = useState<PanelMode>('closed');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Contact[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<Contact[]>([]);
+  const [groupName, setGroupName] = useState('');
+  const [loading, setLoading] = useState(false);
   const selectConversation = useConversationStore((s) => s.selectConversation);
   const addConversation = useConversationStore((s) => s.addConversation);
 
   const handleSearch = async (q: string) => {
-    setQuery(q);
+    setSearchQuery(q);
     if (q.length < 2) {
-      setResults([]);
+      setSearchResults([]);
       return;
     }
     try {
       const users = await api.searchUsers(q);
-      setResults(users);
+      setSearchResults(users);
     } catch {
-      setResults([]);
+      setSearchResults([]);
     }
   };
 
   const openNewChat = async () => {
-    setNewChatOpen(true);
+    setPanelMode('new-chat');
+    setSearchQuery('');
+    setSearchResults([]);
     try {
       const c = await api.getContacts();
       setContacts(c);
@@ -40,32 +46,65 @@ export default function SidebarHeader() {
   };
 
   const startDM = async (contactId: number) => {
+    setLoading(true);
     try {
       const conv = await api.createConversation({ participant_id: contactId });
       addConversation(conv);
       selectConversation(conv.id);
-      setNewChatOpen(false);
-      setQuery('');
+      closePanel();
     } catch {
-      // conversation might already exist
+      // conversation might already exist, try to find it
+      const convs = useConversationStore.getState().conversations;
+      const existing = convs.find((c) => !c.is_group && c.other_user?.id === contactId);
+      if (existing) {
+        selectConversation(existing.id);
+        closePanel();
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
+  const toggleMember = (contact: Contact) => {
+    setSelectedMembers((prev) => {
+      const exists = prev.find((m) => m.id === contact.id);
+      if (exists) return prev.filter((m) => m.id !== contact.id);
+      return [...prev, contact];
+    });
+  };
+
+  const createGroup = async () => {
+    if (!groupName.trim() || selectedMembers.length === 0) return;
+    setLoading(true);
+    try {
+      const conv = await api.createConversation({
+        name: groupName.trim(),
+        member_ids: selectedMembers.map((m) => m.id),
+      });
+      addConversation(conv);
+      selectConversation(conv.id);
+      closePanel();
+    } catch {
+      // handle error
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const closePanel = () => {
+    setPanelMode('closed');
+    setSearchQuery('');
+    setSearchResults([]);
+    setSelectedMembers([]);
+    setGroupName('');
+  };
+
   return (
-    <div className="flex-shrink-0">
+    <div className="flex-shrink-0 relative">
       {/* Header bar */}
       <div className="flex items-center justify-between px-4 py-3">
         <h1 className="text-lg font-semibold text-label-primary">Chats</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setSearchOpen(!searchOpen)}
-            className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors"
-            title="Search"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
+        <div className="flex items-center gap-1">
           <button
             onClick={openNewChat}
             className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors"
@@ -78,134 +117,254 @@ export default function SidebarHeader() {
         </div>
       </div>
 
-      {/* Search bar */}
-      {searchOpen && (
-        <div className="px-3 pb-3">
-          <div className="relative">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-label-tertiary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Search..."
-              className="w-full pl-9 pr-3 py-2 bg-bg-tertiary rounded-lg text-sm text-label-primary placeholder:text-label-tertiary outline-none focus:ring-1 focus:ring-brand"
-              autoFocus
-            />
-          </div>
-          {results.length > 0 && (
-            <div className="mt-2 bg-bg-secondary rounded-lg overflow-hidden">
-              {results.map((user) => (
-                <button
-                  key={user.id}
-                  onClick={() => startDM(user.id)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-bg-hover text-left"
-                >
-                  <Avatar name={user.display_name} size="sm" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-label-primary truncate">
-                      {user.display_name}
-                    </p>
-                    <p className="text-xs text-label-secondary">@{user.username}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* New Chat Panel */}
-      {newChatOpen && (
+      {/* New Chat Panel (overlay) */}
+      {panelMode !== 'closed' && (
         <div className="absolute inset-0 z-50 bg-bg-primary flex flex-col">
+          {/* Panel header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
             <button
-              onClick={() => { setNewChatOpen(false); setQuery(''); }}
+              onClick={() => {
+                if (panelMode === 'new-group-select') {
+                  setPanelMode('new-chat');
+                  setSelectedMembers([]);
+                } else if (panelMode === 'new-group-name') {
+                  setPanelMode('new-group-select');
+                  setGroupName('');
+                } else {
+                  closePanel();
+                }
+              }}
               className="p-1 rounded-full hover:bg-bg-hover text-label-secondary"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h2 className="text-lg font-semibold text-label-primary">New chat</h2>
-          </div>
-
-          {/* Search */}
-          <div className="px-3 py-3">
-            <div className="relative">
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-label-tertiary"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+            <h2 className="text-lg font-semibold text-label-primary">
+              {panelMode === 'new-chat' && 'New chat'}
+              {panelMode === 'new-group-select' && 'New group'}
+              {panelMode === 'new-group-name' && 'Name group'}
+            </h2>
+            {panelMode === 'new-group-select' && selectedMembers.length > 0 && (
+              <button
+                onClick={() => setPanelMode('new-group-name')}
+                className="ml-auto text-sm font-medium text-brand hover:text-brand-hover"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => handleSearch(e.target.value)}
-                placeholder="Name, username, or number"
-                className="w-full pl-9 pr-3 py-2 bg-bg-tertiary rounded-lg text-sm text-label-primary placeholder:text-label-tertiary outline-none focus:ring-1 focus:ring-brand"
-                autoFocus
-              />
-            </div>
-          </div>
-
-          {/* Results or contacts */}
-          <div className="flex-1 overflow-y-auto">
-            {query.length >= 2 && results.length > 0 ? (
-              <div>
-                <p className="px-4 py-2 text-xs font-semibold text-label-secondary uppercase">
-                  Search results
-                </p>
-                {results.map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => startDM(user.id)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left"
-                  >
-                    <Avatar name={user.display_name} size="md" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-label-primary truncate">
-                        {user.display_name}
-                      </p>
-                      <p className="text-xs text-label-secondary">@{user.username}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div>
-                <p className="px-4 py-2 text-xs font-semibold text-label-secondary uppercase">
-                  Contacts
-                </p>
-                {contacts.map((contact) => (
-                  <button
-                    key={contact.id}
-                    onClick={() => startDM(contact.id)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left"
-                  >
-                    <Avatar name={contact.display_name} size="md" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-label-primary truncate">
-                        {contact.display_name}
-                      </p>
-                      <p className="text-xs text-label-secondary">@{contact.username}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
+                Next ({selectedMembers.length})
+              </button>
+            )}
+            {panelMode === 'new-group-name' && (
+              <button
+                onClick={createGroup}
+                disabled={!groupName.trim() || loading}
+                className="ml-auto text-sm font-medium text-brand hover:text-brand-hover disabled:opacity-50"
+              >
+                {loading ? 'Creating...' : 'Create'}
+              </button>
             )}
           </div>
+
+          {/* New chat mode */}
+          {panelMode === 'new-chat' && (
+            <>
+              {/* Search */}
+              <div className="px-3 py-3">
+                <div className="relative">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-label-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    placeholder="Name, username, or number"
+                    className="w-full pl-9 pr-3 py-2 bg-bg-tertiary rounded-lg text-sm text-label-primary placeholder:text-label-tertiary outline-none focus:ring-1 focus:ring-brand"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                {/* New group option */}
+                <button
+                  onClick={() => {
+                    setPanelMode('new-group-select');
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left"
+                >
+                  <div className="w-10 h-10 rounded-full bg-brand/20 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <span className="text-sm font-medium text-label-primary">New group</span>
+                </button>
+
+                {/* Search results */}
+                {searchQuery.length >= 2 && searchResults.length > 0 && (
+                  <div>
+                    <p className="px-4 py-2 text-xs font-semibold text-label-secondary uppercase">Search results</p>
+                    {searchResults.map((user) => (
+                      <button
+                        key={user.id}
+                        onClick={() => startDM(user.id)}
+                        disabled={loading}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left disabled:opacity-50"
+                      >
+                        <Avatar name={user.display_name} size="md" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-label-primary truncate">{user.display_name}</p>
+                          <p className="text-xs text-label-secondary">@{user.username}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Contacts list */}
+                {searchQuery.length < 2 && (
+                  <div>
+                    <p className="px-4 py-2 text-xs font-semibold text-label-secondary uppercase">Contacts</p>
+                    {contacts.map((contact) => (
+                      <button
+                        key={contact.id}
+                        onClick={() => startDM(contact.id)}
+                        disabled={loading}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left disabled:opacity-50"
+                      >
+                        <Avatar name={contact.display_name} size="md" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-label-primary truncate">{contact.display_name}</p>
+                          <p className="text-xs text-label-secondary">@{contact.username}</p>
+                        </div>
+                      </button>
+                    ))}
+                    {contacts.length === 0 && (
+                      <p className="px-4 py-6 text-sm text-label-secondary text-center">No contacts yet</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* New group — select members */}
+          {panelMode === 'new-group-select' && (
+            <>
+              {/* Search for non-contacts */}
+              <div className="px-3 py-3">
+                <div className="relative">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-label-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    placeholder="Search for people"
+                    className="w-full pl-9 pr-3 py-2 bg-bg-tertiary rounded-lg text-sm text-label-primary placeholder:text-label-tertiary outline-none focus:ring-1 focus:ring-brand"
+                  />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                {/* Selected members chips */}
+                {selectedMembers.length > 0 && (
+                  <div className="px-4 py-2 flex flex-wrap gap-2">
+                    {selectedMembers.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => toggleMember(m)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-brand/20 text-brand rounded-full text-xs font-medium hover:bg-brand/30"
+                      >
+                        {m.display_name}
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Search results or contacts */}
+                {searchQuery.length >= 2 && searchResults.length > 0 ? (
+                  <div>
+                    <p className="px-4 py-2 text-xs font-semibold text-label-secondary uppercase">Search results</p>
+                    {searchResults.map((user) => {
+                      const selected = selectedMembers.some((m) => m.id === user.id);
+                      return (
+                        <button
+                          key={user.id}
+                          onClick={() => toggleMember(user)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left"
+                        >
+                          <Avatar name={user.display_name} size="md" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-label-primary truncate">{user.display_name}</p>
+                            <p className="text-xs text-label-secondary">@{user.username}</p>
+                          </div>
+                          {selected && (
+                            <svg className="w-5 h-5 text-brand flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : searchQuery.length < 2 ? (
+                  <div>
+                    <p className="px-4 py-2 text-xs font-semibold text-label-secondary uppercase">Contacts</p>
+                    {contacts.map((contact) => {
+                      const selected = selectedMembers.some((m) => m.id === contact.id);
+                      return (
+                        <button
+                          key={contact.id}
+                          onClick={() => toggleMember(contact)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left"
+                        >
+                          <Avatar name={contact.display_name} size="md" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-label-primary truncate">{contact.display_name}</p>
+                            <p className="text-xs text-label-secondary">@{contact.username}</p>
+                          </div>
+                          {selected && (
+                            <svg className="w-5 h-5 text-brand flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            </>
+          )}
+
+          {/* New group — name the group */}
+          {panelMode === 'new-group-name' && (
+            <div className="flex-1 flex flex-col items-center justify-center px-6 gap-4">
+              <div className="w-16 h-16 rounded-full bg-brand/20 flex items-center justify-center">
+                <svg className="w-8 h-8 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Group name"
+                className="w-full px-4 py-2.5 bg-bg-tertiary rounded-lg text-sm text-label-primary placeholder:text-label-tertiary outline-none focus:ring-1 focus:ring-brand text-center"
+                autoFocus
+              />
+              <p className="text-xs text-label-secondary">
+                {selectedMembers.length} member{selectedMembers.length !== 1 ? 's' : ''} selected
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
