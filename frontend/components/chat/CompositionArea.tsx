@@ -78,7 +78,6 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
 
     let attachmentId: number | undefined;
 
-    // Upload file if pending
     if (pendingFile) {
       setUploading(true);
       try {
@@ -91,10 +90,8 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
       setUploading(false);
     }
 
-    // Optimistic add
     optimisticallySendMessage(conversationId, content, replyTo?.id, attachmentId, expiresIn || undefined);
 
-    // Send via WS
     send({
       type: 'message',
       conversation_id: conversationId,
@@ -131,17 +128,19 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
     { label: '5 minutes', value: 300 },
   ];
 
+  const hasContent = text.trim().length > 0 || pendingFile;
+
   return (
-    <div className="flex-shrink-0 border-t border-border bg-bg-primary px-4 py-3">
+    <div className="flex-shrink-0 bg-bg-primary px-4 py-3 border-t border-border">
       <div className="max-w-2xl mx-auto">
         {/* Reply-to preview */}
         {replyTo && (
-          <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-bg-tertiary rounded-lg">
-            <div className="flex-1 min-w-0 border-l-2 border-brand pl-2">
+          <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-bg-tertiary rounded-t-lg border-l-2 border-brand">
+            <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-brand">{replyTo.sender_name}</p>
               <p className="text-xs text-label-secondary truncate">{replyTo.content || 'Attachment'}</p>
             </div>
-            <button onClick={() => setReplyTo(null)} className="text-label-tertiary hover:text-label-secondary">
+            <button onClick={() => setReplyTo(null)} className="text-label-tertiary hover:text-label-secondary p-1">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -164,7 +163,7 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
           </div>
         )}
 
-        <div className="flex items-end gap-2 relative">
+        <div className="flex items-end gap-1 relative">
           {/* Emoji picker */}
           {showEmoji && (
             <EmojiPicker
@@ -190,17 +189,27 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
             </div>
           )}
 
-          {/* Timer button */}
+          {/* Plus / attachment button */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileSelect}
+            accept="image/*,.pdf,.doc,.docx,.txt,.zip"
+          />
           <button
-            onClick={() => setShowTimerMenu(!showTimerMenu)}
-            className={`p-2 rounded-full hover:bg-bg-hover transition-colors flex-shrink-0 ${
-              expiresIn > 0 ? 'text-brand' : 'text-label-secondary'
-            }`}
-            title="Disappearing messages"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors flex-shrink-0"
+            title="Attach file"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            {uploading ? (
+              <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            )}
           </button>
 
           {/* Emoji button */}
@@ -222,39 +231,33 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
               onKeyDown={handleKeyDown}
               placeholder="Message"
               rows={1}
-              className="w-full px-4 py-2.5 bg-bg-tertiary rounded-2xl text-sm text-label-primary placeholder:text-label-tertiary outline-none resize-none overflow-hidden max-h-32 focus:ring-1 focus:ring-brand"
+              className="w-full px-4 py-2.5 bg-bg-tertiary rounded-2xl text-sm text-label-primary placeholder:text-label-tertiary outline-none resize-none overflow-hidden max-h-32 focus:ring-1 focus:ring-brand/50"
               style={{ minHeight: '40px' }}
             />
           </div>
 
-          {/* Attachment button */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={handleFileSelect}
-            accept="image/*,.pdf,.doc,.docx,.txt,.zip"
-          />
+          {/* Timer button */}
           <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors flex-shrink-0"
-            title="Attach file"
+            onClick={() => setShowTimerMenu(!showTimerMenu)}
+            className={`p-2 rounded-full hover:bg-bg-hover transition-colors flex-shrink-0 ${
+              expiresIn > 0 ? 'text-brand' : 'text-label-secondary'
+            }`}
+            title="Disappearing messages"
           >
-            {uploading ? (
-              <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-              </svg>
-            )}
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </button>
 
           {/* Send button */}
           <button
             onClick={handleSend}
-            disabled={(!text.trim() && !pendingFile) || uploading}
-            className="p-2 rounded-full bg-brand hover:bg-brand-hover disabled:opacity-30 text-white transition-colors flex-shrink-0"
+            disabled={!hasContent || uploading}
+            className={`p-2 rounded-full transition-colors flex-shrink-0 ${
+              hasContent
+                ? 'bg-brand hover:bg-brand-hover text-white'
+                : 'text-label-secondary'
+            }`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

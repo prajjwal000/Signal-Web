@@ -10,6 +10,7 @@ interface ConversationState {
   selectConversation: (id: number | null) => void;
   updateLastMessage: (convId: number, content: string, updatedAt: string) => void;
   decrementUnread: (convId: number) => void;
+  incrementUnread: (convId: number) => void;
   addConversation: (conv: Conversation) => void;
 }
 
@@ -53,6 +54,13 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   decrementUnread: (convId) => {
     const convs = get().conversations.map((c) =>
       c.id === convId ? { ...c, unread_count: Math.max(0, c.unread_count - 1) } : c
+    );
+    set({ conversations: convs });
+  },
+
+  incrementUnread: (convId) => {
+    const convs = get().conversations.map((c) =>
+      c.id === convId ? { ...c, unread_count: c.unread_count + 1 } : c
     );
     set({ conversations: convs });
   },

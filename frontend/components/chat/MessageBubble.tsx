@@ -39,14 +39,6 @@ export default function MessageBubble({
   const user = useAuthStore((s) => s.user);
   const { send } = useWebSocketContext();
 
-  const radiusClass = isOwn
-    ? isLastInGroup
-      ? 'rounded-2xl rounded-br-md'
-      : 'rounded-2xl rounded-r-md'
-    : isLastInGroup
-      ? 'rounded-2xl rounded-bl-md'
-      : 'rounded-2xl rounded-l-md';
-
   const handleReaction = (emoji: string) => {
     send({ type: 'reaction', message_id: message.id, emoji, action: 'add' });
     setShowReactionPicker(false);
@@ -57,16 +49,24 @@ export default function MessageBubble({
   return (
     <div
       className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
-        showSender && !isOwn ? 'mt-2' : 'mt-0.5'
-      } relative`}
+        showSender && !isOwn ? 'mt-3' : 'mt-0.5'
+      } relative group`}
       onMouseLeave={() => setShowReactionPicker(false)}
     >
       <div
-        className={`max-w-[70%] px-3 py-2 ${
+        className={`max-w-[70%] px-3 py-1.5 ${
           isOwn
             ? 'bg-surface-msg-out text-white'
             : 'bg-surface-msg-in text-label-primary'
-        } ${radiusClass}`}
+        } ${
+          isOwn
+            ? isLastInGroup
+              ? 'rounded-2xl rounded-br-sm'
+              : 'rounded-2xl rounded-r-sm'
+            : isLastInGroup
+              ? 'rounded-2xl rounded-bl-sm'
+              : 'rounded-2xl rounded-l-sm'
+        }`}
       >
         {showSender && !isOwn && (
           <p className="text-xs font-semibold text-brand mb-0.5">
@@ -76,7 +76,7 @@ export default function MessageBubble({
 
         {/* Reply-to preview */}
         {message.reply_to_msg && (
-          <div className={`mb-1.5 pl-2 border-l-2 ${
+          <div className={`mb-1 pl-2 border-l-2 ${
             isOwn ? 'border-white/40' : 'border-brand/40'
           } text-xs opacity-80`}>
             <p className="font-semibold">{message.reply_to_msg.sender_name}</p>
@@ -86,7 +86,7 @@ export default function MessageBubble({
 
         {/* Attachment */}
         {message.attachment && (
-          <div className="mb-1.5">
+          <div className="mb-1">
             {isImage ? (
               <img
                 src={getAttachmentUrl(message.attachment.id)}
@@ -117,12 +117,12 @@ export default function MessageBubble({
 
         {/* Content */}
         {message.content && (
-          <div className="flex items-end gap-2">
-            <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
-            <div className="flex items-center gap-1 flex-shrink-0 self-end pb-0.5">
+          <div className="flex items-end gap-1">
+            <p className="text-[14px] leading-[21px] break-words whitespace-pre-wrap">{message.content}</p>
+            <div className="flex items-center gap-1 flex-shrink-0 self-end pb-0.5 ml-1">
               <span
-                className={`text-[10px] ${
-                  isOwn ? 'text-white/70' : 'text-label-tertiary'
+                className={`text-[11px] ${
+                  isOwn ? 'text-white/60' : 'text-label-tertiary'
                 }`}
               >
                 {formatTime(message.created_at)}
@@ -135,7 +135,7 @@ export default function MessageBubble({
         {/* If no content but has attachment (image-only message) */}
         {!message.content && message.attachment && (
           <div className="flex items-center justify-end gap-1 mt-0.5">
-            <span className={`text-[10px] ${isOwn ? 'text-white/70' : 'text-label-tertiary'}`}>
+            <span className={`text-[11px] ${isOwn ? 'text-white/60' : 'text-label-tertiary'}`}>
               {formatTime(message.created_at)}
             </span>
             {isOwn && <MessageStatus status={message.status || 'sent'} />}
@@ -179,12 +179,12 @@ export default function MessageBubble({
       </div>
 
       {/* Reaction trigger — show on hover */}
-      <div className="absolute top-0 right-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        style={{ [isOwn ? 'left' : 'right']: '-28px' }}
+      >
         <button
           onClick={() => setShowReactionPicker(!showReactionPicker)}
-          className={`p-1 rounded-full ${
-            isOwn ? 'mr-1' : 'ml-1'
-          } bg-bg-tertiary hover:bg-bg-active text-label-secondary`}
+          className="p-1 rounded-full bg-bg-tertiary hover:bg-bg-active text-label-secondary shadow-sm"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -195,7 +195,7 @@ export default function MessageBubble({
       {/* Quick reaction picker */}
       {showReactionPicker && (
         <div
-          className={`absolute -top-10 ${isOwn ? 'right-0' : 'left-0'} z-20 flex items-center gap-0.5 bg-bg-tertiary rounded-full px-2 py-1 shadow-lg border border-border`}
+          className={`absolute -top-12 ${isOwn ? 'right-0' : 'left-0'} z-20 flex items-center gap-0.5 bg-bg-tertiary rounded-full px-2 py-1.5 shadow-lg border border-border`}
         >
           {QUICK_EMOJIS.map((emoji) => (
             <button

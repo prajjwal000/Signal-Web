@@ -21,7 +21,7 @@ export default function DateSeparator({ date }: { date: string }) {
 
   return (
     <div className="flex items-center justify-center py-3">
-      <span className="px-3 py-1 bg-bg-tertiary rounded-full text-xs text-label-secondary font-medium">
+      <span className="px-3 py-1 bg-bg-tertiary/80 rounded-full text-xs text-label-secondary font-medium">
         {label}
       </span>
     </div>

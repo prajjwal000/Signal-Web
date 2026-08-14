@@ -32,18 +32,24 @@ export default function ChatPane() {
 
   if (!selectedConvId) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-bg-secondary text-label-secondary">
-        <div className="w-20 h-20 rounded-full border-2 border-dashed border-label-tertiary flex items-center justify-center mb-4">
-          <svg className="w-10 h-10 text-label-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+      <div className="h-full flex flex-col items-center justify-center bg-bg-primary text-label-secondary select-none">
+        {/* Signal logo */}
+        <div className="mb-6">
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+            <circle cx="40" cy="40" r="38" stroke="currentColor" strokeWidth="1.5" className="text-label-tertiary" />
+            <path
+              d="M40 20C30.059 20 22 28.059 22 38c0 3.39.96 6.54 2.61 9.22L22 58l11.05-2.52C36.02 56.82 37.97 57.5 40 57.5c9.941 0 18-8.059 18-18S49.941 20 40 20z"
+              fill="currentColor"
+              className="text-brand"
+            />
           </svg>
         </div>
-        <h2 className="text-xl font-semibold text-label-primary mb-1">Welcome to Signal</h2>
-        <p className="text-sm">Select a conversation to start messaging</p>
+        <h2 className="text-xl font-bold text-label-primary mb-1">Signal</h2>
+        <p className="text-sm text-label-secondary mb-6">Send private messages to anyone on Signal</p>
+        <p className="text-xs text-label-tertiary">Select a conversation or start a new one</p>
       </div>
     );
   }
 
-  // Key forces remount on conversation change — resets all internal state (reply, scroll, etc.)
   return <ChatContent key={selectedConvId} conversationId={selectedConvId} />;
 }
