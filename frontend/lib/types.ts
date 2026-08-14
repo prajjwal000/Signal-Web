@@ -23,15 +23,33 @@ export interface Conversation {
   last_sender?: string;
   updated_at: string;
   unread_count: number;
-  // For DMs: the other user's info
   other_user?: {
     id: number;
     username: string;
     display_name: string;
     avatar_url?: string;
   };
-  // For groups: member count
   member_count?: number;
+}
+
+export interface Attachment {
+  id: number;
+  filename: string;
+  mime_type: string;
+  size: number;
+}
+
+export interface ReplyToMsg {
+  id: number;
+  content: string;
+  sender_id: number;
+  sender_name: string;
+}
+
+export interface ReactionGroup {
+  emoji: string;
+  count: number;
+  users: { user_id: number; display_name: string }[];
 }
 
 export interface Message {
@@ -41,8 +59,12 @@ export interface Message {
   sender_name?: string;
   content: string;
   created_at: string;
+  reply_to?: number | null;
+  reply_to_msg?: ReplyToMsg | null;
+  expires_at?: string | null;
+  attachment?: Attachment | null;
+  reactions?: ReactionGroup[];
   receipts: Receipt[];
-  // Client-side status for optimistic updates
   status?: 'sending' | 'sent' | 'delivered' | 'read';
 }
 
@@ -53,12 +75,22 @@ export interface Receipt {
   updated_at: string;
 }
 
+export interface GroupMember {
+  id: number;
+  username: string;
+  display_name: string;
+  avatar_url?: string;
+  role: string;
+  joined_at: string;
+}
+
 // WebSocket event types
 export type WSEvent =
   | WSMessageEvent
   | WSReceiptEvent
   | WSTypingEvent
-  | WSPresenceEvent;
+  | WSPresenceEvent
+  | WSReactionEvent;
 
 export interface WSMessageEvent {
   type: 'message';
@@ -85,9 +117,17 @@ export interface WSPresenceEvent {
   status: 'online' | 'offline';
 }
 
+export interface WSReactionEvent {
+  type: 'reaction';
+  message_id: number;
+  conversation_id: number;
+  reactions: ReactionGroup[];
+}
+
 // WebSocket outbound events
 export type WSOutbound =
-  | { type: 'message'; conversation_id: number; content: string }
+  | { type: 'message'; conversation_id: number; content: string; reply_to?: number; attachment_id?: number; expires_in?: number }
   | { type: 'receipt'; message_id: number; status: 'delivered' | 'read' }
   | { type: 'read_all'; conversation_id: number }
-  | { type: 'typing'; conversation_id: number; is_typing: boolean };
+  | { type: 'typing'; conversation_id: number; is_typing: boolean }
+  | { type: 'reaction'; message_id: number; emoji: string; action: 'add' | 'remove' };

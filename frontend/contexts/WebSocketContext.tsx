@@ -40,6 +40,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const updateReceipt = useMessageStore((s) => s.updateReceipt);
   const setTyping = useMessageStore((s) => s.setTyping);
   const setPresence = useMessageStore((s) => s.setPresence);
+  const updateReactions = useMessageStore((s) => s.updateReactions);
   const updateConversationLastMessage = useConversationStore((s) => s.updateLastMessage);
 
   const addToast = useToastStore((s) => s.addToast);
@@ -106,6 +107,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             case 'presence':
               setPresence(data.user_id, data.status);
               break;
+
+            case 'reaction':
+              updateReactions(data.message_id, data.conversation_id, data.reactions);
+              break;
           }
         } catch {
           // Ignore malformed messages
@@ -146,7 +151,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       wsRef.current = null;
       setConnected(false);
     };
-  }, [token, user, addMessage, updateReceipt, setTyping, setPresence, updateConversationLastMessage, send, addToast]);
+  }, [token, user, addMessage, updateReceipt, setTyping, setPresence, updateReactions, updateConversationLastMessage, send, addToast]);
 
   return (
     <WebSocketContext.Provider value={{ connected, send, disconnect }}>

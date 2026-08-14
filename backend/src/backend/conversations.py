@@ -64,17 +64,6 @@ def list_conversations(current_user: dict = Depends(get_current_user)):
         else:
             conv["last_message"] = None
 
-        # For direct conversations, set name to the other person's display name
-        if not r[1] and not r[2]:
-            other = conn.execute(
-                """SELECT u.display_name, u.avatar_url FROM conversation_members cm
-                JOIN users u ON u.id = cm.user_id
-                WHERE cm.conversation_id = ? AND cm.user_id != ?""",
-                [r[0], uid],
-            ).fetchone() if False else None
-            # Re-open connection for this query (or do it in the main query)
-            # We'll handle this client-side instead
-
         result.append(conv)
 
     # For direct conversations, fetch the other member's info
@@ -93,6 +82,12 @@ def list_conversations(current_user: dict = Depends(get_current_user)):
                     "display_name": other[1],
                     "avatar_url": other[2],
                 }
+        else:
+            count = conn2.execute(
+                "SELECT COUNT(*) FROM conversation_members WHERE conversation_id = ?",
+                [conv["id"]],
+            ).fetchone()
+            conv["member_count"] = count[0] if count else 0
     conn2.close()
 
     return result
@@ -161,6 +156,43 @@ def create_conversation(req: CreateConversationRequest, current_user: dict = Dep
     raise HTTPException(status_code=400, detail="Provide participant_id for direct or name+member_ids for group")
 
 
+@router.get("/{conv_id}/members")
+def get_members(conv_id: int, current_user: dict = Depends(get_current_user)):
+    conn = get_db()
+    uid = current_user["id"]
+
+    # Verify membership
+    member = conn.execute(
+        "SELECT 1 FROM conversation_members WHERE conversation_id = ? AND user_id = ?",
+        [conv_id, uid],
+    ).fetchone()
+    if not member:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Not a member")
+
+    rows = conn.execute(
+        """SELECT u.id, u.username, u.display_name, u.avatar_url, cm.role, cm.joined_at
+        FROM conversation_members cm
+        JOIN users u ON u.id = cm.user_id
+        WHERE cm.conversation_id = ?
+        ORDER BY cm.role DESC, u.display_name""",
+        [conv_id],
+    ).fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": r[0],
+            "username": r[1],
+            "display_name": r[2],
+            "avatar_url": r[3],
+            "role": r[4],
+            "joined_at": r[5],
+        }
+        for r in rows
+    ]
+
+
 @router.get("/{conv_id}/messages")
 def get_messages(
     conv_id: int,
@@ -183,6 +215,7 @@ def get_messages(
     if before:
         rows = conn.execute(
             """SELECT m.id, m.sender_id, m.content, m.created_at,
+                      m.reply_to, m.expires_at,
                       u.display_name, u.avatar_url
             FROM messages m
             JOIN users u ON u.id = m.sender_id
@@ -194,6 +227,7 @@ def get_messages(
     else:
         rows = conn.execute(
             """SELECT m.id, m.sender_id, m.content, m.created_at,
+                      m.reply_to, m.expires_at,
                       u.display_name, u.avatar_url
             FROM messages m
             JOIN users u ON u.id = m.sender_id
@@ -205,20 +239,74 @@ def get_messages(
 
     messages = []
     for r in rows:
+        msg_id = r[0]
+
+        # Receipts
         receipts = conn.execute(
             """SELECT mr.user_id, mr.status, u.display_name
             FROM message_receipts mr
             JOIN users u ON u.id = mr.user_id
             WHERE mr.message_id = ?""",
-            [r[0]],
+            [msg_id],
         ).fetchall()
+
+        # Reactions
+        reaction_rows = conn.execute(
+            """SELECT mr.emoji, mr.user_id, u.display_name
+            FROM message_reactions mr
+            JOIN users u ON u.id = mr.user_id
+            WHERE mr.message_id = ?
+            ORDER BY mr.created_at""",
+            [msg_id],
+        ).fetchall()
+        reactions: dict[str, list[dict]] = {}
+        for emoji, user_id, display_name in reaction_rows:
+            if emoji not in reactions:
+                reactions[emoji] = []
+            reactions[emoji].append({"user_id": user_id, "display_name": display_name})
+
+        # Attachment
+        attachment = None
+        att_row = conn.execute(
+            """SELECT a.id, a.filename, a.mime_type, a.size
+            FROM attachments a
+            WHERE a.id = (SELECT MAX(a2.id) FROM attachments a2 WHERE a2.sender_id = ? AND a2.created_at <= ?)
+            LIMIT 1""",
+            [r[1], r[3]],
+        ).fetchone()
+
+        # Reply-to message
+        reply_to_msg = None
+        if r[4]:
+            rt = conn.execute(
+                """SELECT m.id, m.content, m.sender_id, u.display_name
+                FROM messages m JOIN users u ON u.id = m.sender_id
+                WHERE m.id = ?""",
+                [r[4]],
+            ).fetchone()
+            if rt:
+                reply_to_msg = {
+                    "id": rt[0],
+                    "content": rt[1],
+                    "sender_id": rt[2],
+                    "sender_name": rt[3],
+                }
+
         messages.append({
-            "id": r[0],
+            "id": msg_id,
             "sender_id": r[1],
             "content": r[2],
             "created_at": r[3],
-            "sender_name": r[4],
-            "sender_avatar": r[5],
+            "reply_to": r[4],
+            "expires_at": r[5],
+            "sender_name": r[6],
+            "sender_avatar": r[7],
+            "attachment": attachment,
+            "reply_to_msg": reply_to_msg,
+            "reactions": [
+                {"emoji": emoji, "count": len(users), "users": users}
+                for emoji, users in reactions.items()
+            ],
             "receipts": [
                 {"user_id": rc[0], "status": rc[1], "user_name": rc[2]}
                 for rc in receipts

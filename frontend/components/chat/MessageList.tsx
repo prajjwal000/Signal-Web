@@ -1,31 +1,36 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useMessageStore } from '@/stores/messageStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useReplyStore } from '@/stores/replyStore';
+import type { Message } from '@/lib/types';
 import MessageBubble from './MessageBubble';
 import DateSeparator from './DateSeparator';
 import ScrollToBottom from './ScrollToBottom';
 
 const SCROLL_THRESHOLD = 200;
 
-export default function MessageList({ conversationId }: { conversationId: number }) {
+interface MessageListProps {
+  conversationId: number;
+}
+
+export default function MessageList({ conversationId }: MessageListProps) {
   const messages = useMessageStore((s) => s.messagesByConv[conversationId] || []);
   const loading = useMessageStore((s) => s.loadingByConv[conversationId]);
   const loadMessages = useMessageStore((s) => s.loadMessages);
   const loadOlderMessages = useMessageStore((s) => s.loadOlderMessages);
   const user = useAuthStore((s) => s.user);
+  const setReplyTo = useReplyStore((s) => s.setReplyTo);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
-  const [isNearBottom, setIsNearBottom] = useState(true);
-  const [newMessageCount, setNewMessageCount] = useState(0);
-  const prevMessageCountRef = useRef(messages.length);
+  const isNearBottomRef = useRef(true);
+  const prevLenRef = useRef(0);
+  const [fab, setFab] = useState({ show: false, count: 0 });
 
   // Load messages on conversation change
   useEffect(() => {
     loadMessages(conversationId);
-    setNewMessageCount(0);
-    prevMessageCountRef.current = 0;
   }, [conversationId, loadMessages]);
 
   // Track scroll position
@@ -34,9 +39,9 @@ export default function MessageList({ conversationId }: { conversationId: number
     if (!el) return;
 
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setIsNearBottom(distanceFromBottom < SCROLL_THRESHOLD);
+    const nearBottom = distanceFromBottom < SCROLL_THRESHOLD;
+    isNearBottomRef.current = nearBottom;
 
-    // Load older messages when scrolled to top
     if (el.scrollTop < 50 && !loadingRef.current) {
       loadingRef.current = true;
       loadOlderMessages(conversationId).then(() => {
@@ -45,25 +50,24 @@ export default function MessageList({ conversationId }: { conversationId: number
     }
   }, [conversationId, loadOlderMessages]);
 
-  // Auto-scroll to bottom on new messages (only if near bottom)
+  // Auto-scroll and FAB logic — use ref-based approach
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
-    const newCount = messages.length - prevMessageCountRef.current;
-    prevMessageCountRef.current = messages.length;
+    const newCount = messages.length - prevLenRef.current;
+    prevLenRef.current = messages.length;
 
     if (newCount > 0) {
-      if (isNearBottom) {
+      if (isNearBottomRef.current) {
         el.scrollTop = el.scrollHeight;
-        setNewMessageCount(0);
       } else {
-        setNewMessageCount((c) => c + newCount);
+        setFab((prev) => ({ show: true, count: prev.count + newCount }));
       }
     }
-  }, [messages.length, isNearBottom]);
+  }, [messages.length]);
 
-  // Scroll to bottom when conversation changes
+  // Scroll to bottom on conversation change
   useEffect(() => {
     const el = scrollRef.current;
     if (el) {
@@ -75,30 +79,33 @@ export default function MessageList({ conversationId }: { conversationId: number
     const el = scrollRef.current;
     if (el) {
       el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-      setNewMessageCount(0);
+      setFab({ show: false, count: 0 });
     }
   };
 
   // Group messages by date
-  const groupedMessages: { date: string; messages: typeof messages }[] = [];
-  let currentGroup: (typeof messages)[0][] = [];
-  let currentDate = '';
+  const groupedMessages = useMemo(() => {
+    const groups: { date: string; messages: Message[] }[] = [];
+    let currentGroup: Message[] = [];
+    let currentDate = '';
 
-  for (const msg of messages) {
-    const date = new Date(msg.created_at).toLocaleDateString();
-    if (date !== currentDate) {
-      if (currentGroup.length > 0) {
-        groupedMessages.push({ date: currentDate, messages: currentGroup });
+    for (const msg of messages) {
+      const date = new Date(msg.created_at).toLocaleDateString();
+      if (date !== currentDate) {
+        if (currentGroup.length > 0) {
+          groups.push({ date: currentDate, messages: currentGroup });
+        }
+        currentGroup = [msg];
+        currentDate = date;
+      } else {
+        currentGroup.push(msg);
       }
-      currentGroup = [msg];
-      currentDate = date;
-    } else {
-      currentGroup.push(msg);
     }
-  }
-  if (currentGroup.length > 0) {
-    groupedMessages.push({ date: currentDate, messages: currentGroup });
-  }
+    if (currentGroup.length > 0) {
+      groups.push({ date: currentDate, messages: currentGroup });
+    }
+    return groups;
+  }, [messages]);
 
   return (
     <div className="flex-1 relative">
@@ -131,13 +138,23 @@ export default function MessageList({ conversationId }: { conversationId: number
                     group.messages[i + 1].sender_id !== msg.sender_id;
 
                   return (
-                    <MessageBubble
-                      key={msg.id}
-                      message={msg}
-                      isOwn={isOwn}
-                      showSender={showSender}
-                      isLastInGroup={isLastInGroup}
-                    />
+                    <div key={msg.id} className="group relative">
+                      <MessageBubble
+                        message={msg}
+                        isOwn={isOwn}
+                        showSender={showSender}
+                        isLastInGroup={isLastInGroup}
+                      />
+                      <button
+                        onClick={() => setReplyTo(msg)}
+                        className="absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-bg-tertiary hover:bg-bg-active text-label-secondary z-10"
+                        style={{ [isOwn ? 'left' : 'right']: '-32px' }}
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -146,9 +163,8 @@ export default function MessageList({ conversationId }: { conversationId: number
         )}
       </div>
 
-      {/* Scroll to bottom FAB */}
-      {!isNearBottom && (
-        <ScrollToBottom onClick={scrollToBottom} newMessageCount={newMessageCount} />
+      {fab.show && (
+        <ScrollToBottom onClick={scrollToBottom} newMessageCount={fab.count} />
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Receipt } from '@/lib/types';
+import type { Message, Receipt, ReactionGroup } from '@/lib/types';
 import * as api from '@/lib/api';
 import { useAuthStore } from './authStore';
 
@@ -15,7 +15,8 @@ interface MessageState {
   updateReceipt: (messageId: number, userId: number, status: Receipt['status']) => void;
   setTyping: (convId: number, userId: number, isTyping: boolean) => void;
   setPresence: (userId: number, status: 'online' | 'offline') => void;
-  optimisticallySendMessage: (convId: number, content: string) => number;
+  updateReactions: (messageId: number, convId: number, reactions: ReactionGroup[]) => void;
+  optimisticallySendMessage: (convId: number, content: string, replyTo?: number, attachmentId?: number, expiresInSeconds?: number) => number;
 }
 
 export const useMessageStore = create<MessageState>((set, get) => ({
@@ -59,9 +60,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
   addMessage: (message) => {
     const convId = message.conversation_id;
     const existing = get().messagesByConv[convId] || [];
-    // Deduplicate
     if (existing.some((m) => m.id === message.id)) return;
-    // Remove any optimistic message with same content from same sender
     const filtered = existing.filter(
       (m) => !(m.id < 0 && m.sender_id === message.sender_id && m.content === message.content)
     );
@@ -75,7 +74,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
 
   updateReceipt: (messageId, userId, status) => {
     const currentUserId = useAuthStore.getState().user?.id;
-    if (userId === currentUserId) return; // Don't update our own receipts
+    if (userId === currentUserId) return;
     const convs = get().messagesByConv;
     for (const [convIdStr, messages] of Object.entries(convs)) {
       const convId = Number(convIdStr);
@@ -86,7 +85,6 @@ export const useMessageStore = create<MessageState>((set, get) => ({
           const receipts = m.receipts.map((r) =>
             r.user_id === userId ? { ...r, status } : r
           );
-          // Update overall status based on best receipt
           const bestStatus = getBestStatus(receipts);
           return { ...m, receipts, status: bestStatus };
         });
@@ -118,7 +116,17 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     });
   },
 
-  optimisticallySendMessage: (convId, content) => {
+  updateReactions: (messageId, convId, reactions) => {
+    const messages = get().messagesByConv[convId] || [];
+    const updated = messages.map((m) =>
+      m.id === messageId ? { ...m, reactions } : m
+    );
+    set((s) => ({
+      messagesByConv: { ...s.messagesByConv, [convId]: updated },
+    }));
+  },
+
+  optimisticallySendMessage: (convId, content, replyTo, attachmentId, expiresInSeconds) => {
     const user = useAuthStore.getState().user;
     if (!user) return -1;
     const tempId = -Date.now();
@@ -129,6 +137,10 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       sender_name: user.display_name,
       content,
       created_at: new Date().toISOString(),
+      reply_to: replyTo,
+      expires_at: expiresInSeconds
+        ? new Date(Date.now() + expiresInSeconds * 1000).toISOString()
+        : undefined,
       receipts: [],
       status: 'sending',
     };

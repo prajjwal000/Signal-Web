@@ -7,6 +7,8 @@ from backend.auth import get_current_user
 from backend.auth_router import router as auth_router
 from backend.contacts import router as contacts_router
 from backend.conversations import router as conversations_router
+from backend.attachments import router as attachments_router
+from backend.reactions import router as reactions_router
 from backend.database import get_db, test_connection
 from backend.models import init_schema
 from backend.seed import seed as run_seed
@@ -29,6 +31,8 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(contacts_router, prefix="/contacts", tags=["contacts"])
 app.include_router(conversations_router, prefix="/conversations", tags=["conversations"])
+app.include_router(attachments_router, prefix="/attachments", tags=["attachments"])
+app.include_router(reactions_router, prefix="/reactions", tags=["reactions"])
 app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(ws_router)
 

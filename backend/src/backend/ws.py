@@ -15,7 +15,6 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket, user_id: int):
         await websocket.accept()
         self.active[user_id] = websocket
-        # Update last_seen
         conn = get_db()
         conn.execute(
             "UPDATE users SET last_seen = datetime('now') WHERE id = ?",
@@ -47,7 +46,6 @@ class ConnectionManager:
         return user_id in self.active
 
     def get_conversation_peers(self, user_id: int) -> list[int]:
-        """Get all user IDs who share a conversation with user_id."""
         conn = get_db()
         rows = conn.execute(
             """SELECT DISTINCT cm2.user_id
@@ -60,7 +58,6 @@ class ConnectionManager:
         return [r[0] for r in rows]
 
     def get_conversation_members(self, conv_id: int) -> list[int]:
-        """Get all member IDs of a conversation."""
         conn = get_db()
         rows = conn.execute(
             "SELECT user_id FROM conversation_members WHERE conversation_id = ?",
@@ -74,7 +71,6 @@ manager = ConnectionManager()
 
 
 async def broadcast_presence(user_id: int, status: str):
-    """Broadcast presence to all conversation peers who are online."""
     peers = manager.get_conversation_peers(user_id)
     for peer_id in peers:
         if manager.is_online(peer_id):
@@ -88,7 +84,13 @@ async def broadcast_presence(user_id: int, status: str):
 async def handle_message(user_id: int, payload: dict):
     conv_id = payload.get("conversation_id")
     content = payload.get("content")
-    if not conv_id or not content:
+    reply_to = payload.get("reply_to")
+    attachment_id = payload.get("attachment_id")
+    expires_in = payload.get("expires_in")  # seconds
+
+    if not conv_id:
+        return
+    if not content and not attachment_id:
         return
 
     # Verify membership
@@ -101,10 +103,18 @@ async def handle_message(user_id: int, payload: dict):
         conn.close()
         return
 
+    # Calculate expires_at
+    expires_at = None
+    if expires_in and expires_in > 0:
+        expires_at = conn.execute(
+            "SELECT datetime('now', '+' || ? || ' seconds')",
+            [expires_in],
+        ).fetchone()[0]
+
     # Insert message
     conn.execute(
-        "INSERT INTO messages (conversation_id, sender_id, content) VALUES (?, ?, ?)",
-        [conv_id, user_id, content],
+        "INSERT INTO messages (conversation_id, sender_id, content, reply_to, expires_at) VALUES (?, ?, ?, ?, ?)",
+        [conv_id, user_id, content or "", reply_to, expires_at],
     )
     msg_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
     created_at = conn.execute("SELECT datetime('now')").fetchone()[0]
@@ -134,14 +144,51 @@ async def handle_message(user_id: int, payload: dict):
     conn.commit()
     conn.close()
 
+    # Get reply_to message info
+    reply_to_msg = None
+    if reply_to:
+        conn2 = get_db()
+        rt = conn2.execute(
+            """SELECT m.id, m.content, m.sender_id, u.display_name
+            FROM messages m JOIN users u ON u.id = m.sender_id
+            WHERE m.id = ?""",
+            [reply_to],
+        ).fetchone()
+        conn2.close()
+        if rt:
+            reply_to_msg = {
+                "id": rt[0], "content": rt[1],
+                "sender_id": rt[2], "sender_name": rt[3],
+            }
+
+    # Get attachment info
+    attachment = None
+    if attachment_id:
+        conn3 = get_db()
+        att = conn3.execute(
+            "SELECT id, filename, mime_type, size FROM attachments WHERE id = ?",
+            [attachment_id],
+        ).fetchone()
+        conn3.close()
+        if att:
+            attachment = {
+                "id": att[0], "filename": att[1],
+                "mime_type": att[2], "size": att[3],
+            }
+
     message_data = {
         "id": msg_id,
         "conversation_id": conv_id,
         "sender_id": user_id,
-        "content": content,
+        "content": content or "",
         "created_at": created_at,
+        "reply_to": reply_to,
+        "reply_to_msg": reply_to_msg,
+        "expires_at": expires_at,
+        "attachment": attachment,
         "sender_name": sender[0] if sender else None,
         "sender_avatar": sender[1] if sender else None,
+        "reactions": [],
     }
 
     # Fan out to all online conversation members
@@ -170,7 +217,6 @@ async def handle_receipt(user_id: int, payload: dict):
         return
 
     conn = get_db()
-    # Verify the message exists, get its sender, and check user membership
     msg = conn.execute(
         "SELECT sender_id, conversation_id FROM messages WHERE id = ?",
         [msg_id],
@@ -179,7 +225,6 @@ async def handle_receipt(user_id: int, payload: dict):
         conn.close()
         return
 
-    # Update receipt
     conn.execute(
         """INSERT INTO message_receipts (message_id, user_id, status, updated_at)
         VALUES (?, ?, ?, datetime('now'))
@@ -189,7 +234,6 @@ async def handle_receipt(user_id: int, payload: dict):
     conn.commit()
     conn.close()
 
-    # Notify the original sender
     sender_id = msg[0]
     if manager.is_online(sender_id):
         await manager.send_to_user(sender_id, {
@@ -206,7 +250,6 @@ async def handle_read_all(user_id: int, payload: dict):
         return
 
     conn = get_db()
-    # Verify membership
     member = conn.execute(
         "SELECT 1 FROM conversation_members WHERE conversation_id = ? AND user_id = ?",
         [conv_id, user_id],
@@ -215,7 +258,6 @@ async def handle_read_all(user_id: int, payload: dict):
         conn.close()
         return
 
-    # Get all messages in this conversation that don't have a read receipt from this user
     unread = conn.execute(
         """SELECT m.id FROM messages m
         WHERE m.conversation_id = ? AND m.sender_id != ?
@@ -233,7 +275,6 @@ async def handle_read_all(user_id: int, payload: dict):
             ON CONFLICT(message_id, user_id) DO UPDATE SET status = 'read', updated_at = datetime('now')""",
             [msg_id, user_id],
         )
-        # Notify each message's sender
         msg = conn.execute("SELECT sender_id FROM messages WHERE id = ?", [msg_id]).fetchone()
         if msg and manager.is_online(msg[0]):
             await manager.send_to_user(msg[0], {
@@ -253,7 +294,6 @@ async def handle_typing(user_id: int, payload: dict):
     if conv_id is None:
         return
 
-    # Verify membership
     conn = get_db()
     member = conn.execute(
         "SELECT 1 FROM conversation_members WHERE conversation_id = ? AND user_id = ?",
@@ -274,11 +314,77 @@ async def handle_typing(user_id: int, payload: dict):
             })
 
 
+async def handle_reaction(user_id: int, payload: dict):
+    msg_id = payload.get("message_id")
+    emoji = payload.get("emoji")
+    action = payload.get("action", "add")  # add or remove
+
+    if not msg_id or not emoji:
+        return
+
+    conn = get_db()
+    msg = conn.execute(
+        "SELECT conversation_id FROM messages WHERE id = ?",
+        [msg_id],
+    ).fetchone()
+    if not msg:
+        conn.close()
+        return
+
+    conv_id = msg[0]
+
+    if action == "add":
+        conn.execute(
+            "INSERT OR IGNORE INTO message_reactions (message_id, user_id, emoji) VALUES (?, ?, ?)",
+            [msg_id, user_id, emoji],
+        )
+    else:
+        conn.execute(
+            "DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?",
+            [msg_id, user_id, emoji],
+        )
+    conn.commit()
+
+    # Get updated reactions
+    reaction_rows = conn.execute(
+        """SELECT mr.emoji, mr.user_id, u.display_name
+        FROM message_reactions mr
+        JOIN users u ON u.id = mr.user_id
+        WHERE mr.message_id = ?
+        ORDER BY mr.created_at""",
+        [msg_id],
+    ).fetchall()
+    conn.close()
+
+    reactions: dict[str, list[dict]] = {}
+    for emoji_key, uid, display_name in reaction_rows:
+        if emoji_key not in reactions:
+            reactions[emoji_key] = []
+        reactions[emoji_key].append({"user_id": uid, "display_name": display_name})
+
+    reaction_data = [
+        {"emoji": e, "count": len(u), "users": u}
+        for e, u in reactions.items()
+    ]
+
+    # Broadcast to all members
+    all_members = manager.get_conversation_members(conv_id)
+    for member_id in all_members:
+        if manager.is_online(member_id):
+            await manager.send_to_user(member_id, {
+                "type": "reaction",
+                "message_id": msg_id,
+                "conversation_id": conv_id,
+                "reactions": reaction_data,
+            })
+
+
 HANDLERS = {
     "message": handle_message,
     "receipt": handle_receipt,
     "read_all": handle_read_all,
     "typing": handle_typing,
+    "reaction": handle_reaction,
 }
 
 
@@ -296,10 +402,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = None):
 
     await manager.connect(websocket, user_id)
 
-    # Send initial presence to peers
     await broadcast_presence(user_id, "online")
 
-    # Send online status of peers to this user
     peers = manager.get_conversation_peers(user_id)
     for peer_id in peers:
         if manager.is_online(peer_id):

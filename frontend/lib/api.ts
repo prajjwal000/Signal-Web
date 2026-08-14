@@ -1,4 +1,4 @@
-import type { User, Contact, Conversation, Message } from './types';
+import type { User, Contact, Conversation, Message, GroupMember } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -101,6 +101,10 @@ export async function getMessages(
   return request(`/conversations/${convId}/messages?${params}`);
 }
 
+export async function getMembers(convId: number): Promise<GroupMember[]> {
+  return request(`/conversations/${convId}/members`);
+}
+
 export async function addMember(convId: number, userId: number): Promise<{ ok: boolean }> {
   return request(`/conversations/${convId}/members`, {
     method: 'POST',
@@ -110,4 +114,47 @@ export async function addMember(convId: number, userId: number): Promise<{ ok: b
 
 export async function removeMember(convId: number, userId: number): Promise<{ ok: boolean }> {
   return request(`/conversations/${convId}/members/${userId}`, { method: 'DELETE' });
+}
+
+// Attachments
+export async function uploadAttachment(file: File): Promise<{ id: number; filename: string; mime_type: string; size: number }> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('signal_token') : null;
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`${API_URL}/attachments`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new ApiError(res.status, body.detail || 'Upload failed');
+  }
+
+  return res.json();
+}
+
+export function getAttachmentUrl(attId: number): string {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('signal_token') : null;
+  return `${API_URL}/attachments/${attId}?token=${token}`;
+}
+
+// Reactions
+export async function addReaction(msgId: number, emoji: string): Promise<{ ok: boolean }> {
+  return request(`/reactions/${msgId}/reactions`, {
+    method: 'POST',
+    body: JSON.stringify({ emoji }),
+  });
+}
+
+export async function removeReaction(msgId: number, emoji: string): Promise<{ ok: boolean }> {
+  return request(`/reactions/${msgId}/reactions/${encodeURIComponent(emoji)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function getReactions(msgId: number): Promise<{ emoji: string; count: number; users: { user_id: number; display_name: string }[] }[]> {
+  return request(`/reactions/${msgId}/reactions`);
 }

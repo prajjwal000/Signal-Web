@@ -7,20 +7,30 @@ import MessageList from './MessageList';
 import CompositionArea from './CompositionArea';
 import ChatHeader from './ChatHeader';
 
-export default function ChatPane() {
-  const selectedConvId = useConversationStore((s) => s.selectedConvId);
+function ChatContent({ conversationId }: { conversationId: number }) {
   const conversations = useConversationStore((s) => s.conversations);
-  const selectedConv = conversations.find((c) => c.id === selectedConvId);
+  const selectedConv = conversations.find((c) => c.id === conversationId);
   const { send } = useWebSocketContext();
 
-  // Send read_all when opening a conversation
   useEffect(() => {
-    if (selectedConvId) {
-      send({ type: 'read_all', conversation_id: selectedConvId });
-    }
-  }, [selectedConvId, send]);
+    send({ type: 'read_all', conversation_id: conversationId });
+  }, [conversationId, send]);
 
-  if (!selectedConvId || !selectedConv) {
+  if (!selectedConv) return null;
+
+  return (
+    <div className="h-full flex flex-col bg-bg-secondary">
+      <ChatHeader conversation={selectedConv} />
+      <MessageList conversationId={conversationId} />
+      <CompositionArea conversationId={conversationId} />
+    </div>
+  );
+}
+
+export default function ChatPane() {
+  const selectedConvId = useConversationStore((s) => s.selectedConvId);
+
+  if (!selectedConvId) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-bg-secondary text-label-secondary">
         <div className="w-20 h-20 rounded-full border-2 border-dashed border-label-tertiary flex items-center justify-center mb-4">
@@ -34,11 +44,6 @@ export default function ChatPane() {
     );
   }
 
-  return (
-    <div className="h-full flex flex-col bg-bg-secondary">
-      <ChatHeader conversation={selectedConv} />
-      <MessageList conversationId={selectedConvId} />
-      <CompositionArea conversationId={selectedConvId} />
-    </div>
-  );
+  // Key forces remount on conversation change — resets all internal state (reply, scroll, etc.)
+  return <ChatContent key={selectedConvId} conversationId={selectedConvId} />;
 }

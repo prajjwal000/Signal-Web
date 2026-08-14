@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 
 type Theme = 'dark' | 'light';
 
@@ -20,37 +20,28 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
-function getSystemTheme(): Theme {
+function getInitialTheme(): Theme {
   if (typeof window === 'undefined') return 'dark';
+  const stored = localStorage.getItem('signal_theme');
+  if (stored === 'light' || stored === 'dark') return stored;
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
-function getStoredTheme(): Theme | null {
-  if (typeof window === 'undefined') return null;
-  const stored = localStorage.getItem('signal_theme');
-  if (stored === 'light' || stored === 'dark') return stored;
-  return null;
-}
-
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('dark');
-  const [mounted, setMounted] = useState(false);
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  const initializedRef = useRef(false);
 
-  // Initialize from localStorage or system preference
+  // Sync data-theme attribute and listen for system changes
   useEffect(() => {
-    const stored = getStoredTheme();
-    const initial = stored || getSystemTheme();
-    setThemeState(initial);
-    document.documentElement.setAttribute('data-theme', initial);
-    setMounted(true);
-  }, []);
+    document.documentElement.setAttribute('data-theme', theme);
 
-  // Listen for system theme changes
-  useEffect(() => {
-    if (!mounted) return;
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      return;
+    }
+
     const mq = window.matchMedia('(prefers-color-scheme: light)');
     const handler = (e: MediaQueryListEvent) => {
-      // Only follow system if user hasn't manually set a preference
       if (!localStorage.getItem('signal_theme')) {
         const newTheme = e.matches ? 'light' : 'dark';
         setThemeState(newTheme);
@@ -59,7 +50,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
-  }, [mounted]);
+  }, [theme]);
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
@@ -68,8 +59,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
-  }, [theme, setTheme]);
+    setThemeState((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('signal_theme', next);
+      document.documentElement.setAttribute('data-theme', next);
+      return next;
+    });
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>

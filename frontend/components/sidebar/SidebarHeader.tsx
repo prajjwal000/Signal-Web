@@ -19,13 +19,6 @@ export default function SidebarHeader() {
   const selectConversation = useConversationStore((s) => s.selectConversation);
   const addConversation = useConversationStore((s) => s.addConversation);
 
-  // Listen for Ctrl+K shortcut to open new chat
-  useEffect(() => {
-    const handler = () => openNewChat();
-    window.addEventListener('signal:new-chat', handler);
-    return () => window.removeEventListener('signal:new-chat', handler);
-  }, []);
-
   const handleSearch = async (q: string) => {
     setSearchQuery(q);
     if (q.length < 2) {
@@ -105,6 +98,13 @@ export default function SidebarHeader() {
     setSelectedMembers([]);
     setGroupName('');
   };
+
+  // Listen for Ctrl+K shortcut to open new chat
+  useEffect(() => {
+    const handler = () => openNewChat();
+    window.addEventListener('signal:new-chat', handler);
+    return () => window.removeEventListener('signal:new-chat', handler);
+  }, []);
 
   return (
     <div className="flex-shrink-0 relative">

@@ -1,6 +1,10 @@
 'use client';
 
+import { useState } from 'react';
+import { useAuthStore } from '@/stores/authStore';
+import { useWebSocketContext } from '@/contexts/WebSocketContext';
 import type { Message } from '@/lib/types';
+import { getAttachmentUrl } from '@/lib/api';
 import MessageStatus from './MessageStatus';
 
 interface MessageBubbleProps {
@@ -17,13 +21,24 @@ function formatTime(dateStr: string): string {
   });
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+
 export default function MessageBubble({
   message,
   isOwn,
   showSender,
   isLastInGroup,
 }: MessageBubbleProps) {
-  // Border radius logic: group consecutive messages
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const user = useAuthStore((s) => s.user);
+  const { send } = useWebSocketContext();
+
   const radiusClass = isOwn
     ? isLastInGroup
       ? 'rounded-2xl rounded-br-md'
@@ -32,11 +47,19 @@ export default function MessageBubble({
       ? 'rounded-2xl rounded-bl-md'
       : 'rounded-2xl rounded-l-md';
 
+  const handleReaction = (emoji: string) => {
+    send({ type: 'reaction', message_id: message.id, emoji, action: 'add' });
+    setShowReactionPicker(false);
+  };
+
+  const isImage = message.attachment?.mime_type?.startsWith('image/');
+
   return (
     <div
       className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
         showSender && !isOwn ? 'mt-2' : 'mt-0.5'
-      }`}
+      } relative`}
+      onMouseLeave={() => setShowReactionPicker(false)}
     >
       <div
         className={`max-w-[70%] px-3 py-2 ${
@@ -50,20 +73,141 @@ export default function MessageBubble({
             {message.sender_name || 'Unknown'}
           </p>
         )}
-        <div className="flex items-end gap-2">
-          <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
-          <div className="flex items-center gap-1 flex-shrink-0 self-end pb-0.5">
-            <span
-              className={`text-[10px] ${
-                isOwn ? 'text-white/70' : 'text-label-tertiary'
-              }`}
-            >
+
+        {/* Reply-to preview */}
+        {message.reply_to_msg && (
+          <div className={`mb-1.5 pl-2 border-l-2 ${
+            isOwn ? 'border-white/40' : 'border-brand/40'
+          } text-xs opacity-80`}>
+            <p className="font-semibold">{message.reply_to_msg.sender_name}</p>
+            <p className="truncate">{message.reply_to_msg.content || 'Attachment'}</p>
+          </div>
+        )}
+
+        {/* Attachment */}
+        {message.attachment && (
+          <div className="mb-1.5">
+            {isImage ? (
+              <img
+                src={getAttachmentUrl(message.attachment.id)}
+                alt={message.attachment.filename}
+                className="rounded-lg max-w-full max-h-60 object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <a
+                href={getAttachmentUrl(message.attachment.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center gap-2 p-2 rounded-lg ${
+                  isOwn ? 'bg-white/10 hover:bg-white/20' : 'bg-bg-hover hover:bg-bg-active'
+                } transition-colors`}
+              >
+                <svg className="w-8 h-8 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium truncate">{message.attachment.filename}</p>
+                  <p className="text-[10px] opacity-70">{formatFileSize(message.attachment.size)}</p>
+                </div>
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Content */}
+        {message.content && (
+          <div className="flex items-end gap-2">
+            <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
+            <div className="flex items-center gap-1 flex-shrink-0 self-end pb-0.5">
+              <span
+                className={`text-[10px] ${
+                  isOwn ? 'text-white/70' : 'text-label-tertiary'
+                }`}
+              >
+                {formatTime(message.created_at)}
+              </span>
+              {isOwn && <MessageStatus status={message.status || 'sent'} />}
+            </div>
+          </div>
+        )}
+
+        {/* If no content but has attachment (image-only message) */}
+        {!message.content && message.attachment && (
+          <div className="flex items-center justify-end gap-1 mt-0.5">
+            <span className={`text-[10px] ${isOwn ? 'text-white/70' : 'text-label-tertiary'}`}>
               {formatTime(message.created_at)}
             </span>
             {isOwn && <MessageStatus status={message.status || 'sent'} />}
           </div>
-        </div>
+        )}
+
+        {/* Expiring indicator */}
+        {message.expires_at && (
+          <div className={`flex items-center gap-1 mt-1 text-[10px] ${isOwn ? 'text-white/50' : 'text-label-tertiary'}`}>
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Disappearing
+          </div>
+        )}
+
+        {/* Reactions */}
+        {message.reactions && message.reactions.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {message.reactions.map((r) => {
+              const myReaction = r.users.some((u) => u.user_id === user?.id);
+              return (
+                <button
+                  key={r.emoji}
+                  onClick={() => handleReaction(r.emoji)}
+                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs ${
+                    myReaction
+                      ? 'bg-brand/20 text-brand'
+                      : isOwn
+                        ? 'bg-white/10 text-white/80 hover:bg-white/20'
+                        : 'bg-bg-hover text-label-secondary hover:bg-bg-active'
+                  }`}
+                >
+                  <span>{r.emoji}</span>
+                  {r.count > 1 && <span>{r.count}</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* Reaction trigger — show on hover */}
+      <div className="absolute top-0 right-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => setShowReactionPicker(!showReactionPicker)}
+          className={`p-1 rounded-full ${
+            isOwn ? 'mr-1' : 'ml-1'
+          } bg-bg-tertiary hover:bg-bg-active text-label-secondary`}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Quick reaction picker */}
+      {showReactionPicker && (
+        <div
+          className={`absolute -top-10 ${isOwn ? 'right-0' : 'left-0'} z-20 flex items-center gap-0.5 bg-bg-tertiary rounded-full px-2 py-1 shadow-lg border border-border`}
+        >
+          {QUICK_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => handleReaction(emoji)}
+              className="text-lg hover:scale-125 transition-transform px-0.5"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
