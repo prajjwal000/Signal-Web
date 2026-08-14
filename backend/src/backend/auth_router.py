@@ -17,6 +17,34 @@ class RegisterRequest(BaseModel):
 class VerifyRequest(BaseModel):
     username: str
     otp: str
+    is_new: bool = False
+
+
+class LoginRequest(BaseModel):
+    username: str
+    otp: str
+
+
+def _find_user(username: str):
+    conn = get_db()
+    user = conn.execute(
+        "SELECT id, username, display_name, phone, avatar_url, last_seen, created_at FROM users WHERE username = ?",
+        [username],
+    ).fetchone()
+    conn.close()
+    return user
+
+
+def _user_response(user):
+    return {
+        "id": user[0],
+        "username": user[1],
+        "display_name": user[2],
+        "phone": user[3],
+        "avatar_url": user[4],
+        "last_seen": user[5],
+        "created_at": user[6],
+    }
 
 
 @router.post("/register")
@@ -42,10 +70,6 @@ def register(req: RegisterRequest):
         [req.username, req.display_name, req.phone],
     )
     conn.commit()
-    user = conn.execute(
-        "SELECT id, username, display_name, phone, avatar_url, last_seen, created_at FROM users WHERE username = ?",
-        [req.username],
-    ).fetchone()
     conn.close()
 
     return {
@@ -59,33 +83,36 @@ def verify(req: VerifyRequest):
     if req.otp != "0000":
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-    conn = get_db()
-    user = conn.execute(
-        "SELECT id, username, display_name, phone, avatar_url, last_seen, created_at FROM users WHERE username = ?",
-        [req.username],
-    ).fetchone()
-    conn.close()
-
+    user = _find_user(req.username)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     user_id = user[0]
 
-    # Auto-seed contacts and conversations for this user
-    seed_user_data(user_id)
+    # Only seed data for newly registered users
+    if req.is_new:
+        seed_user_data(user_id)
 
     token = encode_token(user_id)
     return {
         "token": token,
-        "user": {
-            "id": user[0],
-            "username": user[1],
-            "display_name": user[2],
-            "phone": user[3],
-            "avatar_url": user[4],
-            "last_seen": user[5],
-            "created_at": user[6],
-        },
+        "user": _user_response(user),
+    }
+
+
+@router.post("/login")
+def login(req: LoginRequest):
+    if req.otp != "0000":
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+
+    user = _find_user(req.username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    token = encode_token(user[0])
+    return {
+        "token": token,
+        "user": _user_response(user),
     }
 
 

@@ -49,8 +49,16 @@ export async function register(data: {
 export async function verify(data: {
   username: string;
   otp: string;
+  is_new?: boolean;
 }): Promise<{ token: string; user: User }> {
   return request('/auth/verify', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function login(data: {
+  username: string;
+  otp: string;
+}): Promise<{ token: string; user: User }> {
+  return request('/auth/login', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function getMe(): Promise<{ user: User }> {
