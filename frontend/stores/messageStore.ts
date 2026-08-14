@@ -29,8 +29,10 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     set((s) => ({ loadingByConv: { ...s.loadingByConv, [convId]: true } }));
     try {
       const messages = await api.getMessages(convId);
+      // Ensure receipts is always an array
+      const normalized = messages.map((m) => ({ ...m, receipts: m.receipts || [] }));
       set((s) => ({
-        messagesByConv: { ...s.messagesByConv, [convId]: messages },
+        messagesByConv: { ...s.messagesByConv, [convId]: normalized },
         loadingByConv: { ...s.loadingByConv, [convId]: false },
       }));
     } catch {
@@ -45,10 +47,12 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     try {
       const older = await api.getMessages(convId, 50, oldestId);
       if (older.length === 0) return false;
+      // Ensure receipts is always an array
+      const normalized = older.map((m) => ({ ...m, receipts: m.receipts || [] }));
       set((s) => ({
         messagesByConv: {
           ...s.messagesByConv,
-          [convId]: [...older, ...s.messagesByConv[convId]],
+          [convId]: [...normalized, ...s.messagesByConv[convId]],
         },
       }));
       return true;
@@ -61,13 +65,16 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     const convId = message.conversation_id;
     const existing = get().messagesByConv[convId] || [];
     if (existing.some((m) => m.id === message.id)) return;
+    // Remove optimistic messages that match this real message
     const filtered = existing.filter(
       (m) => !(m.id < 0 && m.sender_id === message.sender_id && m.content === message.content)
     );
+    // Ensure receipts is always an array
+    const normalized = { ...message, receipts: message.receipts || [] };
     set((s) => ({
       messagesByConv: {
         ...s.messagesByConv,
-        [convId]: [...filtered, message],
+        [convId]: [...filtered, normalized],
       },
     }));
   },
@@ -80,14 +87,20 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       const convId = Number(convIdStr);
       const msg = messages.find((m) => m.id === messageId);
       if (msg) {
-        const updated = messages.map((m) => {
-          if (m.id !== messageId) return m;
-          const receipts = m.receipts.map((r) =>
+        const currentReceipts = msg.receipts || [];
+        const existingReceipt = currentReceipts.find((r) => r.user_id === userId);
+        let newReceipts: Receipt[];
+        if (existingReceipt) {
+          newReceipts = currentReceipts.map((r) =>
             r.user_id === userId ? { ...r, status } : r
           );
-          const bestStatus = getBestStatus(receipts);
-          return { ...m, receipts, status: bestStatus };
-        });
+        } else {
+          newReceipts = [...currentReceipts, { message_id: messageId, user_id: userId, status, updated_at: '' }];
+        }
+        const bestStatus = getBestStatus(newReceipts);
+        const updated = messages.map((m) =>
+          m.id === messageId ? { ...m, receipts: newReceipts, status: bestStatus } : m
+        );
         set((s) => ({
           messagesByConv: { ...s.messagesByConv, [convId]: updated },
         }));
@@ -154,8 +167,8 @@ export const useMessageStore = create<MessageState>((set, get) => ({
   },
 }));
 
-function getBestStatus(receipts: Receipt[]): Message['status'] {
-  if (receipts.length === 0) return 'sent';
+function getBestStatus(receipts: Receipt[] | undefined): Message['status'] {
+  if (!receipts || receipts.length === 0) return 'sent';
   const statuses = receipts.map((r) => r.status);
   if (statuses.every((s) => s === 'read')) return 'read';
   if (statuses.some((s) => s === 'delivered')) return 'delivered';

@@ -28,11 +28,17 @@ def decode_token(token: str) -> int:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
-async def get_current_user(authorization: str = Header(None)) -> dict:
-    if not authorization or not authorization.startswith("Bearer "):
+async def get_current_user(
+    authorization: str = Header(None),
+    token: str | None = None,
+) -> dict:
+    if authorization and authorization.startswith("Bearer "):
+        raw = authorization.split(" ", 1)[1]
+    elif token:
+        raw = token
+    else:
         raise HTTPException(status_code=401, detail="Missing token")
-    token = authorization.split(" ", 1)[1]
-    user_id = decode_token(token)
+    user_id = decode_token(raw)
     conn = get_db()
     user = conn.execute(
         "SELECT id, username, display_name, phone, avatar_url, last_seen, created_at FROM users WHERE id = ?",

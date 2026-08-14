@@ -11,13 +11,14 @@ import ScrollToBottom from './ScrollToBottom';
 import ContextMenu from '@/components/ui/ContextMenu';
 
 const SCROLL_THRESHOLD = 200;
+const EMPTY_MESSAGES: Message[] = [];
 
 interface MessageListProps {
   conversationId: number;
 }
 
 export default function MessageList({ conversationId }: MessageListProps) {
-  const messages = useMessageStore((s) => s.messagesByConv[conversationId] || []);
+  const messages = useMessageStore((s) => s.messagesByConv[conversationId] ?? EMPTY_MESSAGES);
   const loading = useMessageStore((s) => s.loadingByConv[conversationId]);
   const loadMessages = useMessageStore((s) => s.loadMessages);
   const loadOlderMessages = useMessageStore((s) => s.loadOlderMessages);

@@ -12,6 +12,7 @@ export interface Contact {
   id: number;
   username: string;
   display_name: string;
+  phone?: string;
   avatar_url?: string;
 }
 
@@ -57,6 +58,7 @@ export interface Message {
   conversation_id: number;
   sender_id: number;
   sender_name?: string;
+  sender_avatar?: string;
   content: string;
   created_at: string;
   reply_to?: number | null;
@@ -64,7 +66,7 @@ export interface Message {
   expires_at?: string | null;
   attachment?: Attachment | null;
   reactions?: ReactionGroup[];
-  receipts: Receipt[];
+  receipts?: Receipt[];
   status?: 'sending' | 'sent' | 'delivered' | 'read';
 }
 
