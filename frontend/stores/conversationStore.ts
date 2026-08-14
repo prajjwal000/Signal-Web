@@ -9,6 +9,7 @@ interface ConversationState {
   loadConversations: () => Promise<void>;
   selectConversation: (id: number | null) => void;
   updateLastMessage: (convId: number, content: string, updatedAt: string) => void;
+  updateUnread: (convId: number, count: number) => void;
   decrementUnread: (convId: number) => void;
   incrementUnread: (convId: number) => void;
   addConversation: (conv: Conversation) => void;
@@ -23,6 +24,14 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     set({ loading: true });
     try {
       const convs = await api.getConversations();
+      const selectedId = get().selectedConvId;
+      if (selectedId !== null) {
+        const local = get().conversations.find(c => c.id === selectedId);
+        if (local && local.unread_count === 0) {
+          const server = convs.find(c => c.id === selectedId);
+          if (server) server.unread_count = 0;
+        }
+      }
       set({ conversations: convs, loading: false });
     } catch {
       set({ loading: false });
@@ -48,6 +57,13 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     );
     // Sort by updated_at descending
     convs.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    set({ conversations: convs });
+  },
+
+  updateUnread: (convId, count) => {
+    const convs = get().conversations.map((c) =>
+      c.id === convId ? { ...c, unread_count: count } : c
+    );
     set({ conversations: convs });
   },
 

@@ -11,14 +11,10 @@ function ChatContent({ conversationId }: { conversationId: number }) {
   const conversations = useConversationStore((s) => s.conversations);
   const selectedConv = conversations.find((c) => c.id === conversationId);
   const { send } = useWebSocketContext();
-  const loadConversations = useConversationStore((s) => s.loadConversations);
 
   useEffect(() => {
     send({ type: 'read_all', conversation_id: conversationId });
-    // Reload conversations to get updated unread counts from backend
-    const timer = setTimeout(() => loadConversations(), 500);
-    return () => clearTimeout(timer);
-  }, [conversationId, send, loadConversations]);
+  }, [conversationId, send]);
 
   if (!selectedConv) return null;
 

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useConversationStore } from '@/stores/conversationStore';
 import { useNavStore } from '@/stores/navStore';
+import { useWebSocketContext } from '@/contexts/WebSocketContext';
 import * as api from '@/lib/api';
 import type { Contact } from '@/lib/types';
 import Avatar from '@/components/ui/Avatar';
@@ -41,6 +42,9 @@ export default function LeftPane() {
   const selectConversation = useConversationStore((s) => s.selectConversation);
   const addConversation = useConversationStore((s) => s.addConversation);
   const loadConversations = useConversationStore((s) => s.loadConversations);
+  const { send } = useWebSocketContext();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const searchQueryRef = useRef('');
 
   const widthBreakpoint = getWidthBreakpoint(sidebarWidth);
 
@@ -48,19 +52,28 @@ export default function LeftPane() {
     loadConversations();
   }, [loadConversations]);
 
-  const handleSearch = useCallback(async (q: string) => {
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      if (e.detail.query === searchQueryRef.current) {
+        setSearchResults(e.detail.results);
+      }
+    };
+    window.addEventListener('ws:user_search_results', handler as EventListener);
+    return () => window.removeEventListener('ws:user_search_results', handler as EventListener);
+  }, []);
+
+  const handleSearch = useCallback((q: string) => {
     setSearchQuery(q);
+    searchQueryRef.current = q;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (q.length < 2) {
       setSearchResults([]);
       return;
     }
-    try {
-      const users = await api.searchUsers(q);
-      setSearchResults(users);
-    } catch {
-      setSearchResults([]);
-    }
-  }, []);
+    debounceRef.current = setTimeout(() => {
+      send({ type: 'user_search', q });
+    }, 250);
+  }, [send]);
 
   const openNewChat = useCallback(async () => {
     setPanelMode('new-chat');

@@ -22,8 +22,9 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isTyping = useRef(false);
-  const { send } = useWebSocketContext();
+  const { send, connected } = useWebSocketContext();
   const optimisticallySendMessage = useMessageStore((s) => s.optimisticallySendMessage);
+  const markMessageFailed = useMessageStore((s) => s.markMessageFailed);
   const replyTo = useReplyStore((s) => s.replyTo);
   const setReplyTo = useReplyStore((s) => s.setReplyTo);
 
@@ -90,9 +91,9 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
       setUploading(false);
     }
 
-    optimisticallySendMessage(conversationId, content, replyTo?.id, attachmentId, expiresIn || undefined);
+    const tempId = optimisticallySendMessage(conversationId, content, replyTo?.id, attachmentId, expiresIn || undefined);
 
-    send({
+    const sent = send({
       type: 'message',
       conversation_id: conversationId,
       content,
@@ -100,6 +101,10 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
       attachment_id: attachmentId,
       expires_in: expiresIn || undefined,
     });
+
+    if (!sent) {
+      markMessageFailed(conversationId, tempId);
+    }
 
     setText('');
     setPendingFile(null);

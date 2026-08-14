@@ -67,7 +67,7 @@ export interface Message {
   attachment?: Attachment | null;
   reactions?: ReactionGroup[];
   receipts?: Receipt[];
-  status?: 'sending' | 'sent' | 'delivered' | 'read';
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 }
 
 export interface Receipt {
@@ -92,7 +92,9 @@ export type WSEvent =
   | WSReceiptEvent
   | WSTypingEvent
   | WSPresenceEvent
-  | WSReactionEvent;
+  | WSReactionEvent
+  | WSConversationUpdateEvent
+  | WSUserSearchResultsEvent;
 
 export interface WSMessageEvent {
   type: 'message';
@@ -126,10 +128,24 @@ export interface WSReactionEvent {
   reactions: ReactionGroup[];
 }
 
+export interface WSConversationUpdateEvent {
+  type: 'conversation_update';
+  conversation_id: number;
+  unread_count: number;
+}
+
+export interface WSUserSearchResultsEvent {
+  type: 'user_search_results';
+  query: string;
+  results: Contact[];
+}
+
 // WebSocket outbound events
 export type WSOutbound =
   | { type: 'message'; conversation_id: number; content: string; reply_to?: number; attachment_id?: number; expires_in?: number }
   | { type: 'receipt'; message_id: number; status: 'delivered' | 'read' }
   | { type: 'read_all'; conversation_id: number }
   | { type: 'typing'; conversation_id: number; is_typing: boolean }
-  | { type: 'reaction'; message_id: number; emoji: string; action: 'add' | 'remove' };
+  | { type: 'reaction'; message_id: number; emoji: string; action: 'add' | 'remove' }
+  | { type: 'user_search'; q: string }
+  | { type: 'ping' };

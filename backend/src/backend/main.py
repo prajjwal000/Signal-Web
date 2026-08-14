@@ -12,7 +12,7 @@ from backend.reactions import router as reactions_router
 from backend.database import get_db, test_connection
 from backend.models import init_schema
 from backend.seed import seed as run_seed
-from backend.ws import router as ws_router
+from backend.ws import router as ws_router, _load_ntfy_user_id
 
 app = FastAPI(title="Signal Clone API")
 
@@ -43,6 +43,7 @@ def startup():
     init_schema(conn)
     conn.close()
     run_seed()
+    _load_ntfy_user_id()
 
 
 @app.get("/health")
@@ -58,6 +59,7 @@ def test_db():
 @app.post("/seed")
 def seed():
     run_seed()
+    _load_ntfy_user_id()
     return {"status": "seeded"}
 
 

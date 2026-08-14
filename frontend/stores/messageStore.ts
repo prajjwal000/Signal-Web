@@ -17,6 +17,8 @@ interface MessageState {
   setPresence: (userId: number, status: 'online' | 'offline') => void;
   updateReactions: (messageId: number, convId: number, reactions: ReactionGroup[]) => void;
   optimisticallySendMessage: (convId: number, content: string, replyTo?: number, attachmentId?: number, expiresInSeconds?: number) => number;
+  markMessageFailed: (convId: number, tempId: number) => void;
+  retryMessage: (convId: number, tempId: number) => { content: string; replyTo?: number; attachmentId?: number; expiresIn?: number } | null;
 }
 
 export const useMessageStore = create<MessageState>((set, get) => ({
@@ -69,8 +71,8 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     const filtered = existing.filter(
       (m) => !(m.id < 0 && m.sender_id === message.sender_id && m.content === message.content)
     );
-    // Ensure receipts is always an array
-    const normalized = { ...message, receipts: message.receipts || [] };
+    const receipts = message.receipts || [];
+    const normalized = { ...message, receipts, status: getBestStatus(receipts) };
     set((s) => ({
       messagesByConv: {
         ...s.messagesByConv,
@@ -163,7 +165,32 @@ export const useMessageStore = create<MessageState>((set, get) => ({
         [convId]: [...(s.messagesByConv[convId] || []), msg],
       },
     }));
+
     return tempId;
+  },
+
+  markMessageFailed: (convId, tempId) => {
+    set((s) => {
+      const msgs = s.messagesByConv[convId] || [];
+      const updated = msgs.map((m) =>
+        m.id === tempId ? { ...m, status: 'failed' as const } : m
+      );
+      return { messagesByConv: { ...s.messagesByConv, [convId]: updated } };
+    });
+  },
+
+  retryMessage: (convId, tempId) => {
+    const msgs = get().messagesByConv[convId] || [];
+    const msg = msgs.find((m) => m.id === tempId);
+    if (!msg || msg.status !== 'failed') return null;
+    // Remove the failed message
+    set((s) => ({
+      messagesByConv: {
+        ...s.messagesByConv,
+        [convId]: msgs.filter((m) => m.id !== tempId),
+      },
+    }));
+    return { content: msg.content, replyTo: msg.reply_to ?? undefined };
   },
 }));
 

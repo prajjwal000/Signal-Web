@@ -40,12 +40,14 @@ uv sync
 export TURSO_DATABASE_URL="libsql://your-db-url.turso.io"
 export TURSO_AUTH_TOKEN="your-turso-auth-token"
 export JWT_SECRET="any-random-secret-string"
+export NTFY_TOPIC="your-ntfy-topic"      # optional: for easter egg push notifications
+export NTFY_USERNAME="your-ntfy-username"  # optional: username that triggers notifications
 
 # Run the server
 uv run uvicorn src.backend.main:app --reload --port 8000
 ```
 
-The schema is auto-created on startup via `CREATE TABLE IF NOT EXISTS`. Seed data is loaded automatically — 12 pre-seeded users with conversations and messages.
+The schema is auto-created on startup via `CREATE TABLE IF NOT EXISTS`. Seed data is loaded automatically — 13 pre-seeded users with conversations and messages.
 
 ### Frontend
 
@@ -286,9 +288,17 @@ All real-time events flow through a single WebSocket connection:
 
 ## Seed Data
 
-The database is seeded automatically on first startup with **12 pre-seeded users** and sample conversations/messages. After registration, the app is immediately usable — you can start messaging other users right away.
+The database is seeded automatically on first startup with **13 pre-seeded users** and sample conversations/messages. After registration, the app is immediately usable — you can start messaging other users right away.
 
 To re-seed: `POST /seed`
+
+---
+
+## Easter Egg
+
+There is a pre-seeded user named **Prajjwal Verma** (username: `prajjwal`) in the app. If you send a message to this user, the developer will receive a real-time push notification on their phone via [ntfy.sh](https://ntfy.sh). This was implemented as a small fun addition to demonstrate external service integration with the messaging backend.
+
+The notification is triggered server-side in the WebSocket message handler. When a message is sent to any conversation that includes `prajjwal` as a member, the backend makes an HTTP POST to ntfy.sh with the sender name and message preview. The topic is configured via the `NTFY_TOPIC` environment variable.
 
 ---
 

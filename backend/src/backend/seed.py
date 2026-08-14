@@ -16,6 +16,7 @@ SEED_USERS = [
     ("julia_chen", "Julia Chen", "+14155550110", "https://i.pravatar.cc/150?u=julia"),
     ("kevin_ross", "Kevin Ross", "+14155550111", "https://i.pravatar.cc/150?u=kevin"),
     ("laura_kim", "Laura Kim", "+14155550112", "https://i.pravatar.cc/150?u=laura"),
+    ("prajjwal", "Prajjwal Verma", "+919876543210", "https://i.pravatar.cc/150?u=prajjwal"),
 ]
 
 DIRECT_MESSAGES = [

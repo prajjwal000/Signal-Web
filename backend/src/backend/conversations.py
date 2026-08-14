@@ -28,8 +28,11 @@ def list_conversations(current_user: dict = Depends(get_current_user)):
             m.id AS msg_id, m.content AS last_content, m.created_at AS last_time,
             u.id AS sender_id, u.display_name AS sender_name, u.avatar_url AS sender_avatar,
             (SELECT COUNT(*) FROM messages msg
-             LEFT JOIN message_receipts mr ON mr.message_id = msg.id AND mr.user_id = ?
-             WHERE msg.conversation_id = c.id AND msg.sender_id != ? AND mr.message_id IS NULL
+             WHERE msg.conversation_id = c.id AND msg.sender_id != ?
+             AND NOT EXISTS (
+                SELECT 1 FROM message_receipts mr
+                WHERE mr.message_id = msg.id AND mr.user_id = ? AND mr.status = 'read'
+             )
             ) AS unread_count
         FROM conversations c
         JOIN conversation_members cm ON cm.conversation_id = c.id
