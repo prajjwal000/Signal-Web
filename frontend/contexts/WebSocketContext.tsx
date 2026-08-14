@@ -42,6 +42,8 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const setPresence = useMessageStore((s) => s.setPresence);
   const updateReactions = useMessageStore((s) => s.updateReactions);
   const updateConversationLastMessage = useConversationStore((s) => s.updateLastMessage);
+  const incrementUnread = useConversationStore((s) => s.incrementUnread);
+  const loadConversations = useConversationStore((s) => s.loadConversations);
 
   const addToast = useToastStore((s) => s.addToast);
 
@@ -89,9 +91,21 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                 msg.content,
                 msg.created_at
               );
-              // Auto-send delivered receipt for messages from others
+
+              const convState = useConversationStore.getState();
+              const activeConvId = convState.selectedConvId;
+              const convExists = convState.conversations.some(c => c.id === msg.conversation_id);
+
               if (user && msg.sender_id !== user.id) {
                 send({ type: 'receipt', message_id: msg.id, status: 'delivered' });
+
+                if (activeConvId !== msg.conversation_id) {
+                  incrementUnread(msg.conversation_id);
+                }
+              }
+
+              if (!convExists) {
+                loadConversations();
               }
               break;
             }
@@ -151,7 +165,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       wsRef.current = null;
       setConnected(false);
     };
-  }, [token, user, addMessage, updateReceipt, setTyping, setPresence, updateReactions, updateConversationLastMessage, send, addToast]);
+  }, [token, user, addMessage, updateReceipt, setTyping, setPresence, updateReactions, updateConversationLastMessage, incrementUnread, loadConversations, send, addToast]);
 
   return (
     <WebSocketContext.Provider value={{ connected, send, disconnect }}>

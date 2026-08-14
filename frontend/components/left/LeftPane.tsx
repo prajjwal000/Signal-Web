@@ -2,12 +2,32 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useConversationStore } from '@/stores/conversationStore';
+import { useNavStore } from '@/stores/navStore';
 import * as api from '@/lib/api';
 import type { Contact } from '@/lib/types';
 import Avatar from '@/components/ui/Avatar';
 import ConversationList from '@/components/conversationList/ConversationList';
 import NavSidebar from './NavSidebar';
 import { WidthBreakpoint, getWidthBreakpoint, type PanelMode } from './types';
+
+function NavSidebarToggleButton() {
+  const toggleNavCollapsed = useNavStore((s) => s.toggleNavCollapsed);
+  const navCollapsed = useNavStore((s) => s.navCollapsed);
+
+  if (!navCollapsed) return null;
+
+  return (
+    <button
+      onClick={toggleNavCollapsed}
+      className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors"
+      title="Expand sidebar"
+    >
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+  );
+}
 
 export default function LeftPane() {
   const [panelMode, setPanelMode] = useState<PanelMode>('closed');
@@ -20,8 +40,13 @@ export default function LeftPane() {
   const [sidebarWidth] = useState(320);
   const selectConversation = useConversationStore((s) => s.selectConversation);
   const addConversation = useConversationStore((s) => s.addConversation);
+  const loadConversations = useConversationStore((s) => s.loadConversations);
 
   const widthBreakpoint = getWidthBreakpoint(sidebarWidth);
+
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
 
   const handleSearch = useCallback(async (q: string) => {
     setSearchQuery(q);
@@ -88,7 +113,6 @@ export default function LeftPane() {
       selectConversation(conv.id);
       closePanel();
     } catch {
-      // handle error
     } finally {
       setLoading(false);
     }
@@ -102,79 +126,72 @@ export default function LeftPane() {
     setGroupName('');
   }, []);
 
-  const openSearch = useCallback(() => {
-    setPanelMode('search');
-    setSearchQuery('');
-    setSearchResults([]);
-  }, []);
-
-  // Listen for Ctrl+K shortcut to open new chat
   useEffect(() => {
     const handler = () => openNewChat();
     window.addEventListener('signal:new-chat', handler);
     return () => window.removeEventListener('signal:new-chat', handler);
   }, [openNewChat]);
 
-  // Render header based on panel mode
   const renderHeader = () => {
     if (panelMode === 'new-chat') {
       return (
-        <div className="flex items-center gap-3 flex-1">
+        <>
           <button onClick={closePanel} className="p-1 rounded-full hover:bg-bg-hover text-label-secondary">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-lg font-bold text-label-primary">New chat</h1>
-        </div>
+          <h1 className="text-lg font-bold text-label-primary flex-1 text-center">New chat</h1>
+          <div className="w-7" />
+        </>
       );
     }
     if (panelMode === 'new-group-select') {
       return (
-        <div className="flex items-center gap-3 flex-1">
+        <>
           <button onClick={() => { setPanelMode('new-chat'); setSelectedMembers([]); }} className="p-1 rounded-full hover:bg-bg-hover text-label-secondary">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-lg font-bold text-label-primary">New group</h1>
+          <h1 className="text-lg font-bold text-label-primary flex-1">New group</h1>
           {selectedMembers.length > 0 && (
-            <button onClick={() => setPanelMode('new-group-name')} className="ml-auto text-sm font-semibold text-brand">
+            <button onClick={() => setPanelMode('new-group-name')} className="text-sm font-semibold text-brand">
               Next ({selectedMembers.length})
             </button>
           )}
-        </div>
+        </>
       );
     }
     if (panelMode === 'new-group-name') {
       return (
-        <div className="flex items-center gap-3 flex-1">
+        <>
           <button onClick={() => { setPanelMode('new-group-select'); setGroupName(''); }} className="p-1 rounded-full hover:bg-bg-hover text-label-secondary">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-lg font-bold text-label-primary">Name group</h1>
+          <h1 className="text-lg font-bold text-label-primary flex-1">Name group</h1>
           <button
             onClick={createGroup}
             disabled={!groupName.trim() || loading}
-            className="ml-auto text-sm font-semibold text-brand disabled:opacity-50"
+            className="text-sm font-semibold text-brand disabled:opacity-50"
           >
             {loading ? 'Creating...' : 'Create'}
           </button>
-        </div>
+        </>
       );
     }
     if (panelMode === 'search') {
       return (
-        <div className="flex items-center gap-3 flex-1">
+        <>
           <button onClick={closePanel} className="p-1 rounded-full hover:bg-bg-hover text-label-secondary">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div className="flex-1 relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-label-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-label-tertiary pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -186,43 +203,40 @@ export default function LeftPane() {
               autoFocus
             />
           </div>
-        </div>
+        </>
       );
     }
-    // Default header
+    // Default: hamburger + "Chats" + compose + more
     return (
       <>
+        <NavSidebarToggleButton />
         <h1 className="text-lg font-bold text-label-primary">Chats</h1>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={openSearch}
-            className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors"
-            title="Search"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
-          <button
-            onClick={openNewChat}
-            className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors"
-            title="New chat"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
-        </div>
+        <div className="flex-1" />
+        <button
+          onClick={openNewChat}
+          className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors"
+          title="New chat"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        </button>
+        <button
+          className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors"
+          title="More options"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+          </svg>
+        </button>
       </>
     );
   };
 
-  // Render content based on panel mode
   const renderContent = () => {
     if (panelMode === 'new-chat') {
       return (
         <>
-          {/* Search */}
           <div className="px-3 py-2">
             <div className="relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-label-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -239,7 +253,6 @@ export default function LeftPane() {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
-            {/* New group option */}
             <button
               onClick={() => { setPanelMode('new-group-select'); setSearchQuery(''); setSearchResults([]); }}
               className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left"
@@ -251,7 +264,24 @@ export default function LeftPane() {
               </div>
               <span className="text-sm font-medium text-label-primary">New group</span>
             </button>
-            {/* Search results */}
+            <button
+              onClick={() => setPanelMode('search')}
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left"
+            >
+              <div className="w-10 h-10 rounded-full bg-bg-tertiary flex items-center justify-center flex-shrink-0">
+                <span className="text-sm font-bold text-label-secondary">@</span>
+              </div>
+              <span className="text-sm font-medium text-label-primary">Find by username</span>
+            </button>
+            <button
+              onClick={() => setPanelMode('search')}
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left"
+            >
+              <div className="w-10 h-10 rounded-full bg-bg-tertiary flex items-center justify-center flex-shrink-0">
+                <span className="text-sm font-bold text-label-secondary">#</span>
+              </div>
+              <span className="text-sm font-medium text-label-primary">Find by phone number</span>
+            </button>
             {searchQuery.length >= 2 && searchResults.length > 0 && (
               <div>
                 <p className="px-4 py-2 text-xs font-semibold text-label-secondary uppercase tracking-wide">Search results</p>
@@ -271,7 +301,6 @@ export default function LeftPane() {
                 ))}
               </div>
             )}
-            {/* Contacts list */}
             {searchQuery.length < 2 && (
               <div>
                 <p className="px-4 py-2 text-xs font-semibold text-label-secondary uppercase tracking-wide">Contacts</p>
@@ -414,74 +443,71 @@ export default function LeftPane() {
 
     if (panelMode === 'search') {
       return (
-        <>
-          <div className="flex-1 overflow-y-auto">
-            {searchQuery.length >= 2 && searchResults.length > 0 ? (
-              <div>
-                {searchResults.map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => startDM(user.id)}
-                    disabled={loading}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left disabled:opacity-50"
-                  >
-                    <Avatar name={user.display_name} size="md" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-label-primary truncate">{user.display_name}</p>
-                      <p className="text-xs text-label-secondary">@{user.username}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : searchQuery.length >= 2 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-label-secondary text-sm">
-                <p>No results found</p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-64 text-label-secondary text-sm">
-                <svg className="w-12 h-12 text-label-tertiary mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <p>Search for people by name, username, or phone number</p>
-              </div>
-            )}
-          </div>
-        </>
+        <div className="flex-1 overflow-y-auto">
+          {searchQuery.length >= 2 && searchResults.length > 0 ? (
+            <div>
+              {searchResults.map((user) => (
+                <button
+                  key={user.id}
+                  onClick={() => startDM(user.id)}
+                  disabled={loading}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover text-left disabled:opacity-50"
+                >
+                  <Avatar name={user.display_name} size="md" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-label-primary truncate">{user.display_name}</p>
+                    <p className="text-xs text-label-secondary">@{user.username}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : searchQuery.length >= 2 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-label-secondary text-sm">
+              <p>No results found</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 text-label-secondary text-sm">
+              <svg className="w-12 h-12 text-label-tertiary mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <p>Search for people by name, username, or phone number</p>
+            </div>
+          )}
+        </div>
       );
     }
 
-    // Default: conversation list
-    return <ConversationList />;
+    return (
+      <>
+        <div className="px-3 py-2">
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-label-tertiary pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                const q = e.target.value;
+                setSearchQuery(q);
+                if (q.length >= 2) {
+                  setPanelMode('search');
+                  handleSearch(q);
+                }
+              }}
+              placeholder="Search"
+              className="w-full pl-9 pr-3 py-1.5 bg-bg-tertiary rounded-lg text-sm text-label-primary placeholder:text-label-tertiary outline-none"
+            />
+          </div>
+        </div>
+        <ConversationList />
+      </>
+    );
   };
 
   return (
     <NavSidebar
-      title="Chats"
-      actions={
-        panelMode === 'closed' ? (
-          <>
-            <button
-              onClick={openSearch}
-              className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors"
-              title="Search"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </button>
-            <button
-              onClick={openNewChat}
-              className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors"
-              title="New chat"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
-          </>
-        ) : undefined
-      }
-      headerContent={panelMode !== 'closed' ? renderHeader() : undefined}
+      headerContent={renderHeader()}
       widthBreakpoint={widthBreakpoint}
     >
       {renderContent()}

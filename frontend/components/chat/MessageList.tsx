@@ -114,7 +114,7 @@ export default function MessageList({ conversationId }: MessageListProps) {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="absolute inset-0 overflow-y-auto px-4 py-2"
+        className="absolute inset-0 overflow-y-auto overflow-x-hidden px-4 py-2"
       >
         {loading && messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -128,7 +128,7 @@ export default function MessageList({ conversationId }: MessageListProps) {
             <p>No messages yet. Say hello!</p>
           </div>
         ) : (
-          <div className="max-w-2xl mx-auto space-y-0.5">
+          <div className="space-y-0.5 px-2">
             {groupedMessages.map((group) => (
               <div key={group.date}>
                 <DateSeparator date={group.date} />
@@ -170,17 +170,6 @@ export default function MessageList({ conversationId }: MessageListProps) {
                           isLastInGroup={isLastInGroup}
                         />
                       </ContextMenu>
-                      {/* Reply button — appears on hover */}
-                      <button
-                        onClick={() => setReplyTo(msg)}
-                        className="absolute top-1/2 -translate-y-1/2 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1.5 rounded-full bg-bg-tertiary hover:bg-bg-active text-label-secondary z-10 shadow-sm"
-                        style={{ [isOwn ? 'left' : 'right']: '-36px' }}
-                        title="Reply"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                        </svg>
-                      </button>
                     </div>
                   );
                 })}

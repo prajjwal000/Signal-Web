@@ -131,26 +131,26 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
   const hasContent = text.trim().length > 0 || pendingFile;
 
   return (
-    <div className="flex-shrink-0 bg-bg-primary px-4 py-3 border-t border-border">
-      <div className="max-w-2xl mx-auto">
-        {/* Reply-to preview */}
-        {replyTo && (
-          <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-bg-tertiary rounded-t-lg border-l-2 border-brand">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-brand">{replyTo.sender_name}</p>
-              <p className="text-xs text-label-secondary truncate">{replyTo.content || 'Attachment'}</p>
-            </div>
-            <button onClick={() => setReplyTo(null)} className="text-label-tertiary hover:text-label-secondary p-1">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+    <div className="flex-shrink-0 bg-bg-primary border-t border-border">
+      {/* Reply-to preview */}
+      {replyTo && (
+        <div className="flex items-center gap-2 px-4 pt-2 pb-0">
+          <div className="flex-1 min-w-0 px-3 py-2 bg-bg-tertiary rounded-lg border-l-2 border-brand">
+            <p className="text-xs font-semibold text-brand">{replyTo.sender_name}</p>
+            <p className="text-xs text-label-secondary truncate">{replyTo.content || 'Attachment'}</p>
           </div>
-        )}
+          <button onClick={() => setReplyTo(null)} className="text-label-tertiary hover:text-label-secondary p-1">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
-        {/* Pending file preview */}
-        {pendingFile && (
-          <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-bg-tertiary rounded-lg">
+      {/* Pending file preview */}
+      {pendingFile && (
+        <div className="flex items-center gap-2 px-4 pt-2 pb-0">
+          <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-bg-tertiary rounded-lg">
             <svg className="w-5 h-5 text-brand flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
             </svg>
@@ -161,109 +161,117 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
               </svg>
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Input row */}
+      <div className="flex items-end gap-1 px-3 py-2 relative">
+        {/* Emoji picker */}
+        {showEmoji && (
+          <EmojiPicker
+            onSelect={handleEmojiSelect}
+            onClose={() => setShowEmoji(false)}
+          />
         )}
 
-        <div className="flex items-end gap-1 relative">
-          {/* Emoji picker */}
-          {showEmoji && (
-            <EmojiPicker
-              onSelect={handleEmojiSelect}
-              onClose={() => setShowEmoji(false)}
-            />
-          )}
-
-          {/* Timer menu */}
-          {showTimerMenu && (
-            <div className="absolute bottom-full left-0 mb-2 bg-bg-tertiary rounded-xl shadow-xl border border-border overflow-hidden z-50">
-              {timerOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => { setExpiresIn(opt.value); setShowTimerMenu(false); }}
-                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-bg-hover ${
-                    expiresIn === opt.value ? 'text-brand font-medium' : 'text-label-primary'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Plus / attachment button */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={handleFileSelect}
-            accept="image/*,.pdf,.doc,.docx,.txt,.zip"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors flex-shrink-0"
-            title="Attach file"
-          >
-            {uploading ? (
-              <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-            )}
-          </button>
-
-          {/* Emoji button */}
-          <button
-            onClick={() => setShowEmoji(!showEmoji)}
-            className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors flex-shrink-0"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </button>
-
-          {/* Text input */}
-          <div className="flex-1 relative">
-            <textarea
-              ref={textareaRef}
-              value={text}
-              onChange={(e) => handleInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Message"
-              rows={1}
-              className="w-full px-4 py-2.5 bg-bg-tertiary rounded-2xl text-sm text-label-primary placeholder:text-label-tertiary outline-none resize-none overflow-hidden max-h-32 focus:ring-1 focus:ring-brand/50"
-              style={{ minHeight: '40px' }}
-            />
+        {/* Timer menu */}
+        {showTimerMenu && (
+          <div className="absolute bottom-full left-0 mb-2 bg-bg-tertiary rounded-xl shadow-xl border border-border overflow-hidden z-50">
+            {timerOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => { setExpiresIn(opt.value); setShowTimerMenu(false); }}
+                className={`block w-full text-left px-4 py-2 text-sm hover:bg-bg-hover ${
+                  expiresIn === opt.value ? 'text-brand font-medium' : 'text-label-primary'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
+        )}
 
-          {/* Timer button */}
-          <button
-            onClick={() => setShowTimerMenu(!showTimerMenu)}
-            className={`p-2 rounded-full hover:bg-bg-hover transition-colors flex-shrink-0 ${
-              expiresIn > 0 ? 'text-brand' : 'text-label-secondary'
-            }`}
-            title="Disappearing messages"
-          >
+        {/* Plus / attachment button */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleFileSelect}
+          accept="image/*,.pdf,.doc,.docx,.txt,.zip"
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors flex-shrink-0"
+          title="Attach file"
+        >
+          {uploading ? (
+            <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          ) : (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-          </button>
+          )}
+        </button>
 
-          {/* Send button */}
+        {/* Emoji button */}
+        <button
+          onClick={() => setShowEmoji(!showEmoji)}
+          className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors flex-shrink-0"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+
+        {/* Text input */}
+        <div className="flex-1 relative">
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => handleInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Message"
+            rows={1}
+            className="w-full px-4 py-2 bg-bg-tertiary rounded-2xl text-sm text-label-primary placeholder:text-label-tertiary outline-none resize-none overflow-hidden max-h-32 focus:ring-1 focus:ring-brand/50"
+            style={{ minHeight: '40px' }}
+          />
+        </div>
+
+        {/* Timer button */}
+        <button
+          onClick={() => setShowTimerMenu(!showTimerMenu)}
+          className={`p-2 rounded-full hover:bg-bg-hover transition-colors flex-shrink-0 ${
+            expiresIn > 0 ? 'text-brand' : 'text-label-secondary'
+          }`}
+          title="Disappearing messages"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+
+        {/* Send / voice button */}
+        {hasContent ? (
           <button
             onClick={handleSend}
-            disabled={!hasContent || uploading}
-            className={`p-2 rounded-full transition-colors flex-shrink-0 ${
-              hasContent
-                ? 'bg-brand hover:bg-brand-hover text-white'
-                : 'text-label-secondary'
-            }`}
+            disabled={uploading}
+            className="p-2 rounded-full bg-brand hover:bg-brand-hover text-white transition-colors flex-shrink-0"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           </button>
-        </div>
+        ) : (
+          <button
+            className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors flex-shrink-0"
+            title="Voice message"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -48,13 +48,13 @@ export default function MessageBubble({
 
   return (
     <div
-      className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
-        showSender && !isOwn ? 'mt-3' : 'mt-0.5'
+      className={`flex ${isOwn ? 'flex-row-reverse' : 'flex-row'} ${
+        showSender && !isOwn ? 'mt-3' : 'mt-[3px]'
       } relative group`}
       onMouseLeave={() => setShowReactionPicker(false)}
     >
       <div
-        className={`max-w-[70%] px-3 py-1.5 ${
+        className={`max-w-[min(306px,calc(100%-38px))] px-3 py-2 ${
           isOwn
             ? 'bg-surface-msg-out text-white'
             : 'bg-surface-msg-in text-label-primary'
@@ -62,10 +62,10 @@ export default function MessageBubble({
           isOwn
             ? isLastInGroup
               ? 'rounded-2xl rounded-br-sm'
-              : 'rounded-2xl rounded-r-sm'
+              : 'rounded-2xl'
             : isLastInGroup
               ? 'rounded-2xl rounded-bl-sm'
-              : 'rounded-2xl rounded-l-sm'
+              : 'rounded-2xl'
         }`}
       >
         {showSender && !isOwn && (
@@ -74,7 +74,6 @@ export default function MessageBubble({
           </p>
         )}
 
-        {/* Reply-to preview */}
         {message.reply_to_msg && (
           <div className={`mb-1 pl-2 border-l-2 ${
             isOwn ? 'border-white/40' : 'border-brand/40'
@@ -84,7 +83,6 @@ export default function MessageBubble({
           </div>
         )}
 
-        {/* Attachment */}
         {message.attachment && (
           <div className="mb-1">
             {isImage ? (
@@ -115,7 +113,6 @@ export default function MessageBubble({
           </div>
         )}
 
-        {/* Content */}
         {message.content && (
           <div className="flex items-end gap-1">
             <p className="text-[14px] leading-[21px] break-words whitespace-pre-wrap">{message.content}</p>
@@ -132,7 +129,6 @@ export default function MessageBubble({
           </div>
         )}
 
-        {/* If no content but has attachment (image-only message) */}
         {!message.content && message.attachment && (
           <div className="flex items-center justify-end gap-1 mt-0.5">
             <span className={`text-[11px] ${isOwn ? 'text-white/60' : 'text-label-tertiary'}`}>
@@ -142,7 +138,6 @@ export default function MessageBubble({
           </div>
         )}
 
-        {/* Expiring indicator */}
         {message.expires_at && (
           <div className={`flex items-center gap-1 mt-1 text-[10px] ${isOwn ? 'text-white/50' : 'text-label-tertiary'}`}>
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -152,7 +147,6 @@ export default function MessageBubble({
           </div>
         )}
 
-        {/* Reactions */}
         {message.reactions && message.reactions.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">
             {message.reactions.map((r) => {
@@ -178,10 +172,10 @@ export default function MessageBubble({
         )}
       </div>
 
-      {/* Reaction trigger — show on hover */}
-      <div className="absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-        style={{ [isOwn ? 'left' : 'right']: '-28px' }}
-      >
+      {/* Reaction trigger */}
+      <div className={`absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 ${
+        isOwn ? '-left-8' : '-right-8'
+      }`}>
         <button
           onClick={() => setShowReactionPicker(!showReactionPicker)}
           className="p-1 rounded-full bg-bg-tertiary hover:bg-bg-active text-label-secondary shadow-sm"
@@ -192,7 +186,6 @@ export default function MessageBubble({
         </button>
       </div>
 
-      {/* Quick reaction picker */}
       {showReactionPicker && (
         <div
           className={`absolute -top-12 ${isOwn ? 'right-0' : 'left-0'} z-20 flex items-center gap-0.5 bg-bg-tertiary rounded-full px-2 py-1.5 shadow-lg border border-border`}

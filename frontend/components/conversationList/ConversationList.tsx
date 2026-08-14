@@ -73,71 +73,77 @@ function ConversationItem({ conv }: { conv: Conversation }) {
     >
       <button
         onClick={() => selectConversation(conv.id)}
-        className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
-          isActive
-            ? 'bg-brand/10 hover:bg-brand/15'
-            : 'hover:bg-bg-hover'
-        }`}
+        className="w-full flex items-center rounded-[10px] my-[2px] mx-0 px-[14px] py-2 text-left transition-colors"
+        style={{
+          height: '72px',
+          background: isActive ? 'var(--color-bg-active)' : 'transparent',
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) e.currentTarget.style.background = 'var(--color-bg-hover)';
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) e.currentTarget.style.background = 'transparent';
+        }}
       >
-      {/* Avatar */}
-      {conv.is_group ? (
-        <div className="w-12 h-12 rounded-full bg-bg-tertiary flex items-center justify-center flex-shrink-0">
-          <svg className="w-6 h-6 text-label-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </div>
-      ) : (
-        <Avatar
-          name={displayName}
-          src={conv.other_user?.avatar_url}
-          size="lg"
-        />
-      )}
+        {/* Avatar */}
+        {conv.is_group ? (
+          <div className="w-[48px] h-[48px] rounded-full bg-bg-tertiary flex items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6 text-label-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+        ) : (
+          <Avatar
+            name={displayName}
+            src={conv.other_user?.avatar_url}
+            size="lg"
+          />
+        )}
 
-      {/* Content */}
-      <div className="flex-1 min-w-0 border-b border-border-light py-1">
-        <div className="flex items-center justify-between">
-          <span
-            className={`text-sm truncate ${
-              hasUnread ? 'font-bold text-label-primary' : 'font-medium text-label-primary'
-            }`}
-          >
-            {displayName}
-          </span>
-          <span
-            className={`text-xs ml-2 flex-shrink-0 ${
-              hasUnread ? 'text-brand font-medium' : 'text-label-tertiary'
-            }`}
-          >
-            {conv.updated_at ? formatTime(conv.updated_at) : ''}
-          </span>
-        </div>
-        <div className="flex items-center justify-between mt-0.5">
-          <div className="flex items-center gap-1 flex-1 min-w-0">
-            {/* Message status icon for last message */}
-            {!isTyping && conv.last_message && conv.last_sender === user?.display_name && (
-              <svg className="w-4 h-4 flex-shrink-0 text-label-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-            {isTyping ? (
-              <p className="text-xs text-brand font-medium truncate">typing...</p>
-            ) : (
-              <p
-                className={`text-xs truncate ${
-                  hasUnread ? 'text-label-primary font-medium' : 'text-label-secondary'
-                }`}
-              >
-                {lastMsg}
-              </p>
-            )}
+        {/* Content */}
+        <div className="flex-1 min-w-0 ml-3 flex flex-col justify-center overflow-hidden">
+          <div className="flex items-center">
+            <span
+              className={`flex-1 min-w-0 truncate text-[15px] ${
+                hasUnread ? 'font-bold' : 'font-medium'
+              }`}
+            >
+              {displayName}
+            </span>
+            <span
+              className={`text-xs ml-2 flex-shrink-0 ${
+                hasUnread ? 'text-brand font-medium' : 'text-label-secondary'
+              }`}
+            >
+              {conv.updated_at ? formatTime(conv.updated_at) : ''}
+            </span>
           </div>
-          <div className="ml-2 flex-shrink-0">
-            <Badge count={conv.unread_count} />
+          <div className="flex items-center mt-0.5">
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+              {!isTyping && conv.last_message && conv.last_sender === user?.display_name && (
+                <svg className="w-4 h-4 flex-shrink-0 text-label-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {isTyping ? (
+                <p className="text-xs text-brand font-medium truncate">typing...</p>
+              ) : (
+                <p
+                  className={`text-[13px] leading-[18px] truncate ${
+                    hasUnread ? 'font-medium' : ''
+                  }`}
+                  style={{ color: 'var(--color-label-secondary)' }}
+                >
+                  {lastMsg}
+                </p>
+              )}
+            </div>
+            <div className="ml-2 flex-shrink-0">
+              <Badge count={conv.unread_count} />
+            </div>
           </div>
         </div>
-      </div>
-    </button>
+      </button>
     </ContextMenu>
   );
 }
@@ -156,9 +162,11 @@ export default function ConversationList() {
           <p className="text-xs mt-1 text-label-tertiary">Tap the compose button to start chatting</p>
         </div>
       ) : (
-        conversations.map((conv) => (
-          <ConversationItem key={conv.id} conv={conv} />
-        ))
+        <div className="px-1">
+          {conversations.map((conv) => (
+            <ConversationItem key={conv.id} conv={conv} />
+          ))}
+        </div>
       )}
     </div>
   );

@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react'
 import { WidthBreakpoint } from './types';
 
 interface NavSidebarProps {
-  title: string;
+  title?: string;
   actions?: ReactNode;
   headerContent?: ReactNode;
   children: ReactNode;
@@ -57,12 +57,12 @@ export default function NavSidebar({
       style={{ width }}
     >
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-border min-h-[52px]">
+      <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-border min-h-[52px]">
         {headerContent ? (
-          headerContent
-        ) : (
+          <div className="flex items-center gap-2 flex-1">{headerContent}</div>
+        ) : title ? (
           <h1 className="text-lg font-bold text-label-primary">{title}</h1>
-        )}
+        ) : null}
         {actions && (
           <div className="flex items-center gap-1">
             {actions}

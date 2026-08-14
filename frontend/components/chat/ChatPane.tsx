@@ -11,15 +11,19 @@ function ChatContent({ conversationId }: { conversationId: number }) {
   const conversations = useConversationStore((s) => s.conversations);
   const selectedConv = conversations.find((c) => c.id === conversationId);
   const { send } = useWebSocketContext();
+  const loadConversations = useConversationStore((s) => s.loadConversations);
 
   useEffect(() => {
     send({ type: 'read_all', conversation_id: conversationId });
-  }, [conversationId, send]);
+    // Reload conversations to get updated unread counts from backend
+    const timer = setTimeout(() => loadConversations(), 500);
+    return () => clearTimeout(timer);
+  }, [conversationId, send, loadConversations]);
 
   if (!selectedConv) return null;
 
   return (
-    <div className="h-full flex flex-col bg-bg-secondary">
+    <div className="h-full flex flex-col bg-bg-primary">
       <ChatHeader conversation={selectedConv} />
       <MessageList conversationId={conversationId} />
       <CompositionArea conversationId={conversationId} />
