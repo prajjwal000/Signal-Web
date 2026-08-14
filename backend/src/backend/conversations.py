@@ -53,16 +53,11 @@ def list_conversations(current_user: dict = Depends(get_current_user)):
             "unread_count": r[10],
         }
         if r[4] is not None:
-            conv["last_message"] = {
-                "id": r[4],
-                "content": r[5],
-                "created_at": r[6],
-                "sender_id": r[7],
-                "sender_name": r[8],
-                "sender_avatar": r[9] if not r[1] else None,
-            }
+            conv["last_message"] = r[5]
+            conv["last_sender"] = r[8]
         else:
             conv["last_message"] = None
+            conv["last_sender"] = None
 
         result.append(conv)
 
@@ -71,7 +66,7 @@ def list_conversations(current_user: dict = Depends(get_current_user)):
     for conv in result:
         if not conv["is_group"]:
             other = conn2.execute(
-                """SELECT u.id, u.display_name, u.avatar_url FROM conversation_members cm
+                """SELECT u.id, u.username, u.display_name, u.avatar_url FROM conversation_members cm
                 JOIN users u ON u.id = cm.user_id
                 WHERE cm.conversation_id = ? AND cm.user_id != ?""",
                 [conv["id"], uid],
@@ -79,8 +74,9 @@ def list_conversations(current_user: dict = Depends(get_current_user)):
             if other:
                 conv["other_user"] = {
                     "id": other[0],
-                    "display_name": other[1],
-                    "avatar_url": other[2],
+                    "username": other[1],
+                    "display_name": other[2],
+                    "avatar_url": other[3],
                 }
         else:
             count = conn2.execute(
@@ -114,8 +110,27 @@ def create_conversation(req: CreateConversationRequest, current_user: dict = Dep
             [uid, req.participant_id],
         ).fetchone()
         if existing:
+            conv_id = existing[0]
+            other = conn.execute(
+                "SELECT u.id, u.username, u.display_name, u.avatar_url FROM users u WHERE u.id = ?",
+                [req.participant_id],
+            ).fetchone()
             conn.close()
-            return {"id": existing[0], "is_group": False}
+            return {
+                "id": conv_id,
+                "is_group": False,
+                "name": None,
+                "updated_at": "",
+                "unread_count": 0,
+                "last_message": None,
+                "last_sender": None,
+                "other_user": {
+                    "id": other[0],
+                    "username": other[1],
+                    "display_name": other[2],
+                    "avatar_url": other[3],
+                } if other else None,
+            }
 
         conn.execute("INSERT INTO conversations (is_group) VALUES (0)")
         conv_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -128,8 +143,27 @@ def create_conversation(req: CreateConversationRequest, current_user: dict = Dep
             [conv_id, req.participant_id],
         )
         conn.commit()
+
+        other = conn.execute(
+            "SELECT u.id, u.username, u.display_name, u.avatar_url FROM users u WHERE u.id = ?",
+            [req.participant_id],
+        ).fetchone()
         conn.close()
-        return {"id": conv_id, "is_group": False}
+        return {
+            "id": conv_id,
+            "is_group": False,
+            "name": None,
+            "updated_at": "",
+            "unread_count": 0,
+            "last_message": None,
+            "last_sender": None,
+            "other_user": {
+                "id": other[0],
+                "username": other[1],
+                "display_name": other[2],
+                "avatar_url": other[3],
+            } if other else None,
+        }
 
     # Group conversation
     if req.name and req.member_ids:
@@ -150,7 +184,16 @@ def create_conversation(req: CreateConversationRequest, current_user: dict = Dep
                 )
         conn.commit()
         conn.close()
-        return {"id": conv_id, "is_group": True}
+        return {
+            "id": conv_id,
+            "is_group": True,
+            "name": req.name,
+            "updated_at": "",
+            "unread_count": 0,
+            "last_message": None,
+            "last_sender": None,
+            "member_count": len(req.member_ids),
+        }
 
     conn.close()
     raise HTTPException(status_code=400, detail="Provide participant_id for direct or name+member_ids for group")
@@ -294,6 +337,7 @@ def get_messages(
 
         messages.append({
             "id": msg_id,
+            "conversation_id": conv_id,
             "sender_id": r[1],
             "content": r[2],
             "created_at": r[3],
@@ -308,7 +352,7 @@ def get_messages(
                 for emoji, users in reactions.items()
             ],
             "receipts": [
-                {"user_id": rc[0], "status": rc[1], "user_name": rc[2]}
+                {"message_id": msg_id, "user_id": rc[0], "status": rc[1], "updated_at": ""}
                 for rc in receipts
             ],
         })

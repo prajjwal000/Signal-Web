@@ -1,5 +1,14 @@
 SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS users (
+DROP TABLE IF EXISTS message_reactions;
+DROP TABLE IF EXISTS attachments;
+DROP TABLE IF EXISTS message_receipts;
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS conversation_members;
+DROP TABLE IF EXISTS conversations;
+DROP TABLE IF EXISTS contacts;
+DROP TABLE IF EXISTS users;
+
+CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     display_name TEXT NOT NULL,
@@ -9,7 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS contacts (
+CREATE TABLE contacts (
     user_id INTEGER NOT NULL,
     contact_id INTEGER NOT NULL,
     created_at TEXT DEFAULT (datetime('now')),
@@ -18,7 +27,7 @@ CREATE TABLE IF NOT EXISTS contacts (
     FOREIGN KEY (contact_id) REFERENCES users(id)
 );
 
-CREATE TABLE IF NOT EXISTS conversations (
+CREATE TABLE conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     is_group INTEGER NOT NULL DEFAULT 0,
     name TEXT,
@@ -26,7 +35,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS conversation_members (
+CREATE TABLE conversation_members (
     conversation_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
     role TEXT NOT NULL DEFAULT 'member',
@@ -36,7 +45,7 @@ CREATE TABLE IF NOT EXISTS conversation_members (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
-CREATE TABLE IF NOT EXISTS messages (
+CREATE TABLE messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id INTEGER NOT NULL,
     sender_id INTEGER NOT NULL,
@@ -49,7 +58,7 @@ CREATE TABLE IF NOT EXISTS messages (
     FOREIGN KEY (reply_to) REFERENCES messages(id)
 );
 
-CREATE TABLE IF NOT EXISTS message_receipts (
+CREATE TABLE message_receipts (
     message_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'sent',
@@ -59,7 +68,7 @@ CREATE TABLE IF NOT EXISTS message_receipts (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
-CREATE TABLE IF NOT EXISTS attachments (
+CREATE TABLE attachments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sender_id INTEGER NOT NULL,
     filename TEXT NOT NULL,
@@ -70,7 +79,7 @@ CREATE TABLE IF NOT EXISTS attachments (
     FOREIGN KEY (sender_id) REFERENCES users(id)
 );
 
-CREATE TABLE IF NOT EXISTS message_reactions (
+CREATE TABLE message_reactions (
     message_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
     emoji TEXT NOT NULL,

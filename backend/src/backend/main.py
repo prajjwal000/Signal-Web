@@ -18,7 +18,7 @@ app = FastAPI(title="Signal Clone API")
 
 users_router = APIRouter()
 
-ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,6 +42,7 @@ def startup():
     conn = get_db()
     init_schema(conn)
     conn.close()
+    run_seed()
 
 
 @app.get("/health")
