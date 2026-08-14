@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 import time
-import urllib.request
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -50,14 +49,18 @@ def _send_ntfy(title: str, message: str):
         print(f"[ntfy] NTFY_TOPIC is empty, skipping")
         return
     try:
-        req = urllib.request.Request(
-            f"https://ntfy.sh/{NTFY_TOPIC}",
-            data=message.encode("utf-8"),
-            headers={"Title": title, "Priority": "high"},
-            method="POST",
+        import http.client, ssl
+        ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection("ntfy.sh", timeout=10, context=ctx, source_address=("0.0.0.0", 0))
+        conn.request(
+            "POST",
+            f"/{NTFY_TOPIC}",
+            body=message.encode("utf-8"),
+            headers={"Title": title, "Priority": "high", "Content-Type": "application/octet-stream"},
         )
-        resp = urllib.request.urlopen(req, timeout=10)
+        resp = conn.getresponse()
         print(f"[ntfy] Sent OK: {resp.status}")
+        conn.close()
     except Exception as e:
         print(f"[ntfy] FAILED: {e}")
 

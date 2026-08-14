@@ -87,7 +87,7 @@ Signal-Web/
 
 ### Easter Egg
 
-A pre-seeded user **Prajjwal Verma** (`prajjwal`) triggers real push notifications. When any message is sent to a conversation containing this user, the backend POSTs to [ntfy.sh](https://ntfy.sh) with the sender name and message preview — configured via `NTFY_TOPIC` and `NTFY_USERNAME` env vars. creator would then get notification and connect using his id to chat with examiner.
+If being read by examiner, i implore you to message the pre-seeded user **Prajjwal Verma** (`prajjwal`) which will trigger a real push notification on my mobile. When any message is sent to a conversation containing this user, the backend POSTs to [ntfy.sh](https://ntfy.sh) with the sender name and message preview — configured via `NTFY_TOPIC` and `NTFY_USERNAME` env vars. this triggers a notification on my mobile app, so that i can hop one and chat with examiner showcasing real-time messaging.
 
 ---
 
