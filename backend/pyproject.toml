@@ -7,10 +7,9 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "alembic>=1.19.1",
     "fastapi>=0.141.1",
     "libsql>=0.1.11",
-    "sqlalchemy>=2.0.52",
+    "pyjwt>=2.8",
     "uvicorn>=0.34.0",
     "websockets>=17.0.1",
 ]

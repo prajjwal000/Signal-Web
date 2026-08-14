@@ -3,7 +3,9 @@ CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     display_name TEXT NOT NULL,
+    phone TEXT UNIQUE,
     avatar_url TEXT,
+    last_seen TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -53,6 +55,13 @@ CREATE TABLE IF NOT EXISTS message_receipts (
     FOREIGN KEY (message_id) REFERENCES messages(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_messages_conv_created ON messages(conversation_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_conv_members_user ON conversation_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_receipts_message ON message_receipts(message_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_user ON contacts(user_id);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 """
 
 
