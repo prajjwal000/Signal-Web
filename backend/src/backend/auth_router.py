@@ -118,4 +118,4 @@ def login(req: LoginRequest):
 
 @router.get("/me")
 async def me(current_user: dict = Depends(get_current_user)):
-    return current_user
+    return {"user": current_user}

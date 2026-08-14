@@ -5,6 +5,7 @@ import { useConversationStore } from '@/stores/conversationStore';
 import { useAuthStore } from '@/stores/authStore';
 import SidebarHeader from '../sidebar/SidebarHeader';
 import ConversationList from '../sidebar/ConversationList';
+import { ConversationListSkeleton } from '@/components/ui/Skeleton';
 
 export default function Sidebar() {
   const loadConversations = useConversationStore((s) => s.loadConversations);
@@ -19,9 +20,7 @@ export default function Sidebar() {
     <div className="flex flex-col h-full bg-bg-primary">
       <SidebarHeader />
       {loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-        </div>
+        <ConversationListSkeleton />
       ) : (
         <ConversationList />
       )}

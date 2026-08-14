@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useConversationStore } from '@/stores/conversationStore';
+import { useWebSocketContext } from '@/contexts/WebSocketContext';
 import MessageList from './MessageList';
 import CompositionArea from './CompositionArea';
 import ChatHeader from './ChatHeader';
@@ -9,6 +11,14 @@ export default function ChatPane() {
   const selectedConvId = useConversationStore((s) => s.selectedConvId);
   const conversations = useConversationStore((s) => s.conversations);
   const selectedConv = conversations.find((c) => c.id === selectedConvId);
+  const { send } = useWebSocketContext();
+
+  // Send read_all when opening a conversation
+  useEffect(() => {
+    if (selectedConvId) {
+      send({ type: 'read_all', conversation_id: selectedConvId });
+    }
+  }, [selectedConvId, send]);
 
   if (!selectedConvId || !selectedConv) {
     return (

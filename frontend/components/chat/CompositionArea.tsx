@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import { useAuthStore } from '@/stores/authStore';
+import { useWebSocketContext } from '@/contexts/WebSocketContext';
 import { useMessageStore } from '@/stores/messageStore';
+import EmojiPicker from './EmojiPicker';
 
 interface CompositionAreaProps {
   conversationId: number;
@@ -11,11 +11,12 @@ interface CompositionAreaProps {
 
 export default function CompositionArea({ conversationId }: CompositionAreaProps) {
   const [text, setText] = useState('');
+  const [showEmoji, setShowEmoji] = useState(false);
   const typingTimeout = useRef<ReturnType<typeof setTimeout>>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isTyping = useRef(false);
-  const token = useAuthStore((s) => s.token);
+  const { send } = useWebSocketContext();
   const optimisticallySendMessage = useMessageStore((s) => s.optimisticallySendMessage);
-  const { send } = useWebSocket(token);
 
   const sendTyping = useCallback(
     (typing: boolean) => {
@@ -38,6 +39,24 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
       isTyping.current = false;
       sendTyping(false);
     }, 3000);
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newText = text.slice(0, start) + emoji + text.slice(end);
+      setText(newText);
+      // Move cursor after emoji
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+        textarea.focus();
+      }, 0);
+    } else {
+      setText((t) => t + emoji);
+    }
+    setShowEmoji(false);
   };
 
   const handleSend = () => {
@@ -65,9 +84,20 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
 
   return (
     <div className="flex-shrink-0 border-t border-border bg-bg-primary px-4 py-3">
-      <div className="max-w-2xl mx-auto flex items-end gap-2">
-        {/* Emoji button (placeholder) */}
-        <button className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors flex-shrink-0">
+      <div className="max-w-2xl mx-auto flex items-end gap-2 relative">
+        {/* Emoji picker */}
+        {showEmoji && (
+          <EmojiPicker
+            onSelect={handleEmojiSelect}
+            onClose={() => setShowEmoji(false)}
+          />
+        )}
+
+        {/* Emoji button */}
+        <button
+          onClick={() => setShowEmoji(!showEmoji)}
+          className="p-2 rounded-full hover:bg-bg-hover text-label-secondary transition-colors flex-shrink-0"
+        >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -76,6 +106,7 @@ export default function CompositionArea({ conversationId }: CompositionAreaProps
         {/* Text input */}
         <div className="flex-1 relative">
           <textarea
+            ref={textareaRef}
             value={text}
             onChange={(e) => handleInput(e.target.value)}
             onKeyDown={handleKeyDown}

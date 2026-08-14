@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
+import { useToast } from '@/hooks/useToast';
 
 type Mode = 'choose' | 'login' | 'register' | 'login-otp' | 'register-otp';
 
@@ -16,6 +17,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const { register, verifyNew, login } = useAuthStore();
   const router = useRouter();
+  const toast = useToast();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,8 +26,11 @@ export default function AuthPage() {
     try {
       await register(username, displayName, phone || undefined);
       setMode('register-otp');
+      toast('Account created! Enter OTP to verify.', 'success');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      const msg = err instanceof Error ? err.message : 'Registration failed';
+      setError(msg);
+      toast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -39,7 +44,9 @@ export default function AuthPage() {
       await verifyNew(username, otp);
       router.replace('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Verification failed');
+      const msg = err instanceof Error ? err.message : 'Verification failed';
+      setError(msg);
+      toast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -53,7 +60,9 @@ export default function AuthPage() {
       await login(username, otp);
       router.replace('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      const msg = err instanceof Error ? err.message : 'Login failed';
+      setError(msg);
+      toast(msg, 'error');
     } finally {
       setLoading(false);
     }
