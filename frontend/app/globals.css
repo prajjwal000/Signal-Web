@@ -127,3 +127,10 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-bg-active);
 }
+
+/* Responsive breakpoints */
+@media (max-width: 767px) {
+  :root {
+    --sidebar-width: 100vw;
+  }
+}

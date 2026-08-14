@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useConversationStore } from '@/stores/conversationStore';
 import * as api from '@/lib/api';
 import type { Contact } from '@/lib/types';
@@ -18,6 +18,13 @@ export default function SidebarHeader() {
   const [loading, setLoading] = useState(false);
   const selectConversation = useConversationStore((s) => s.selectConversation);
   const addConversation = useConversationStore((s) => s.addConversation);
+
+  // Listen for Ctrl+K shortcut to open new chat
+  useEffect(() => {
+    const handler = () => openNewChat();
+    window.addEventListener('signal:new-chat', handler);
+    return () => window.removeEventListener('signal:new-chat', handler);
+  }, []);
 
   const handleSearch = async (q: string) => {
     setSearchQuery(q);
